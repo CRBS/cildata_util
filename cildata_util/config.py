@@ -12,11 +12,11 @@ class CILDatabaseConfigMissingError(Exception):
     """
     pass
 
+
 class CILDatabaseConfigParseError(Exception):
     """Raised if unable to extract a value from config
     """
     pass
-
 
 
 def setup_logging(thelogger,
@@ -40,8 +40,7 @@ def setup_logging(thelogger,
     thelogger.setLevel(numericloglevel)
     logging.basicConfig(format=log_format)
     logging.getLogger('cildata_util.config').setLevel(numericloglevel)
-    logging.getLogger('cildata_util.cildatadownloader')\
-        .setLevel(numericloglevel)
+    logging.getLogger('cildata_util.dbutil').setLevel(numericloglevel)
 
 
 class CILDatabaseConfig(object):
@@ -59,7 +58,8 @@ class CILDatabaseConfig(object):
         :param config_file: Path to config file to parse
         """
         if config_file is None:
-            raise CILDatabaseConfigMissingError('None passed in for config file')
+            raise CILDatabaseConfigMissingError('None passed in for '
+                                                'config file')
 
         if not os.path.isfile(config_file):
             raise CILDatabaseConfigMissingError('Config file not found on '

@@ -13,7 +13,9 @@ with open('HISTORY.rst') as history_file:
 
 requirements = [
     "argparse",
-    "configparser"
+    "configparser",
+    "pg8000",
+    "requests"
 ]
 
 setup_requirements = [
@@ -22,7 +24,9 @@ setup_requirements = [
 
 test_requirements = [
     "argparse",
-    "configparser"
+    "configparser",
+    "pg8000",
+    "requests"
 ]
 
 setup(

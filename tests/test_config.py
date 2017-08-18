@@ -106,10 +106,5 @@ class TestConfig(unittest.TestCase):
             self.assertEqual(dbconfig.get_host(), 'host')
             self.assertEqual(dbconfig.get_port(), 5432)
             self.assertEqual(dbconfig.get_database_name(), 'db')
-
-
-
-
         finally:
             shutil.rmtree(temp_dir)
-
