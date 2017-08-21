@@ -1,5 +1,7 @@
 import logging
 import pg8000
+import jsonpickle
+import json
 
 
 logger = logging.getLogger(__name__)
@@ -56,6 +58,7 @@ class CILDataFile(object):
         self._download_time = None
         self._checksum = None
         self._localfile = None
+        self._headers = None
 
     def get_id(self):
         """Gets id
@@ -94,6 +97,18 @@ class CILDataFile(object):
 
     def set_localfile(self, localfile):
         self._localfile = localfile
+
+    def set_headers(self, headers):
+        """Sets headers obtained when
+           downloading data
+        """
+        self._headers = headers
+
+    def get_headers(self):
+        """Gets headers obtained when
+           downloading data
+        """
+        return self._headers
 
     def get_is_video(self):
         """Gets is video
@@ -134,11 +149,14 @@ class CILDataFileFromDatabaseFactory(object):
     """
     IMG_SUFFIX_LIST = ['.tif', '.jpg', '.raw']
     VID_SUFFIX_LIST = ['.flv', '.raw']
-    def __init__(self, conn):
+
+    def __init__(self, conn, id=None):
         """Constructor
         :param conn: database connection already connected
+        :param id: only return CILDataFile objects with matching id.
         """
         self._conn = conn
+        self._id = id
 
     def get_cildatafiles(self):
         """Queries database to get CILDataFile objects
@@ -158,6 +176,7 @@ class CILDataFileFromDatabaseFactory(object):
                         counter = 1
                     else:
                         newcdf = CILDataFile(cur_id)
+                        newcdf.set_is_video(True)
 
                     newcdf.set_file_name(str(cur_id) + suffix)
                     newcdflist.append(newcdf)
@@ -186,12 +205,17 @@ class CILDataFileFromDatabaseFactory(object):
         cildatafiles = []
         cursor = self._conn.cursor()
         try:
+            if self._id is not None:
+                idfilter = " AND image_id='CIL_" + self._id + "'"
+            else:
+                idfilter = ''
             cursor.execute("SELECT replace(image_id,'CIL_', '') as image_id,"
-                           "is_video from cil_data_type where is_public=true")
+                           "is_video from cil_data_type where is_public=true" +
+                           idfilter)
 
-            for tuple in cursor.fetchall():
-                cdf = CILDataFile(tuple[0])
-                cdf.set_is_video(bool(tuple[1]))
+            for entry in cursor.fetchall():
+                cdf = CILDataFile(entry[0])
+                cdf.set_is_video(bool(entry[1]))
                 cildatafiles.append(cdf)
         finally:
             cursor.close()
@@ -200,3 +224,26 @@ class CILDataFileFromDatabaseFactory(object):
         return cildatafiles
 
 
+class CILDataFileJsonPickleWriter(object):
+    """Persists CILDataFile objects to a file using jsonpickle
+    """
+    SUFFIX = '.json'
+    def __init__(self):
+        """Constructor
+        """
+        pass
+
+    def writeCILDataFileListToFile(self, outfile,
+                                   cildatafile_list):
+
+        """Writes CILDataFile objects in list to a file
+           in json format
+        """
+        json_cdf_list = []
+        for cdf in cildatafile_list:
+            json_cdf_list.append(jsonpickle.encode(cdf))
+
+        logger.debug('Writing out json file to ' + outfile)
+        full_outfile = outfile + CILDataFileJsonPickleWriter.SUFFIX
+        with open(full_outfile, 'w') as out_file:
+            json.dump(json_cdf_list, out_file)

@@ -7,12 +7,15 @@ import logging
 import os
 import requests
 import shutil
+import time
+import hashlib
 
 import cildata_util
 from cildata_util import config
 from cildata_util.config import CILDatabaseConfig
 from cildata_util.dbutil import Database
 from cildata_util.dbutil import CILDataFileFromDatabaseFactory
+from cildata_util.dbutil import CILDataFileJsonPickleWriter
 
 logger = logging.getLogger('cildata_util.cildatadownloader')
 
@@ -31,22 +34,36 @@ def _parse_arguments(desc, args):
                         'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help="Set the logging level (default WARNING)",
                         default='WARNING')
+    parser.add_argument('--id', help='Only download data with id passed in.')
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
     return parser.parse_args(args)
 
 
-def _download_file(url, dest_dir):
+def _download_file(url, dest_dir, numretries=3,
+                   retry_sleep=10):
 
-    logger.debug('Downloading from ' + url)
     local_filename = url.split('/')[-1]
     dest_file = os.path.join(dest_dir, local_filename)
-    r = requests.get(url, stream=True)
+    logger.debug('Downloading from ' + url + ' to ' + dest_file)
+    retry_count = 0
+    while retry_count < numretries:
+        try:
+            r = requests.get(url, timeout=20, stream=True)
 
-    with open(dest_file, 'wb') as f:
-        shutil.copyfileobj(r.raw, f)
-    logger.debug(r.headers)
-    return local_filename, r.headers['Content-Type'], r.status_code
+            with open(dest_file, 'wb') as f:
+                shutil.copyfileobj(r.raw, f)
+            logger.debug('Headers: ' + str(r.headers))
+            return local_filename, r.headers, r.status_code
+        except Exception as e:
+            retry_count += 1
+            logger.exception('Caught some exception trying to '
+                             'download. Sleeping ' + str(retry_sleep) +
+                             ' seconds and will retry again # ' +
+                             str(retry_count))
+            time.sleep(retry_sleep)
+
+    return None, None, 999
 
 
 def _get_download_url(base_url, omero_url, cdf):
@@ -65,6 +82,15 @@ def _get_download_url(base_url, omero_url, cdf):
     logger.error('Not sure how to download this file: ' +
                  cdf.get_file_name())
     return None
+
+
+def _md5(fname):
+    hash_md5 = hashlib.md5()
+    logger.debug('Calculating md5 of file: ' + fname)
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
 
 
 def _download_cil_data_file(destination_dir, cdf, loadbaseurl=False):
@@ -89,16 +115,26 @@ def _download_cil_data_file(destination_dir, cdf, loadbaseurl=False):
     download_url = _get_download_url(base_url, omero_url, cdf)
     if download_url is None:
         return
-    local_file, content_type, status = _download_file(download_url +
-                                                      cdf.get_file_name(),
-                                                      out_dir)
-    logger.debug('content type: ' + content_type)
+
+    (local_file, headers,
+     status) = _download_file(download_url +
+                              cdf.get_file_name(),
+                              out_dir)
+
     logger.debug('status: ' + str(status))
-    cdf.set_mime_type(content_type)
-    cdf.set_localfile(local_file)
+    if headers is not None:
+        logger.debug('content type: ' + headers['Content-Type'])
+        cdf.set_mime_type(headers['Content-Type'])
+        cdf.set_localfile(local_file)
+        cdf.set_headers(headers)
     if status is 200:
         cdf.set_download_success(True)
+        cdf.set_checksum(_md5(os.path.join(destination_dir,
+                                           str(cdf.get_id()),
+                                           cdf.get_localfile())))
     else:
+        logger.warning('Error downloading ' + cdf.get_file_name() +
+                       ' code: ' + str(status))
         cdf.set_download_success(False)
 
     return cdf
@@ -115,10 +151,13 @@ def _download_cil_data_files(theargs):
     videos_destdir = os.path.join(abs_destdir, 'videos')
     conn = None
     last_id = -1
+    last_outdir = None
+    same_id_cdf_list = []
+    writer = CILDataFileJsonPickleWriter()
     try:
 
         conn = db.get_connection()
-        fac = CILDataFileFromDatabaseFactory(conn)
+        fac = CILDataFileFromDatabaseFactory(conn, id=theargs.id)
         cildatafiles = fac.get_cildatafiles()
         logger.info('Found ' + str(len(cildatafiles)) + ' entries')
 
@@ -133,9 +172,27 @@ def _download_cil_data_files(theargs):
                 loadbaseurl = False
             else:
                 loadbaseurl = True
+                if len(same_id_cdf_list) > 0:
+
+                    writerfile = os.path.join(last_outdir, str(last_id),
+                                              str(last_id))
+                    writer.writeCILDataFileListToFile(writerfile,
+                                                      same_id_cdf_list)
+                    same_id_cdf_list = []
+
             last_id = entry.get_id()
+            last_outdir = out_dir
             cdf = _download_cil_data_file(out_dir, entry, loadbaseurl=loadbaseurl)
-        
+            same_id_cdf_list.append(cdf)
+
+        if len(same_id_cdf_list) > 0:
+            writerfile = os.path.join(last_outdir, str(last_id),
+                                      str(last_id))
+            writer.writeCILDataFileListToFile(writerfile,
+                                              same_id_cdf_list)
+
+
+
     finally:
         if conn is not None:
             conn.close()
@@ -158,7 +215,11 @@ def main(args):
     theargs.version = cildata_util.__version__
     config.setup_logging(logger, loglevel=theargs.loglevel)
 
-    return _download_cil_data_files(theargs)
+    try:
+        return _download_cil_data_files(theargs)
+    except Exception as e:
+        logger.exception('Caught fatal exception')
+        return 1
 
 
 if __name__ == '__main__':  # pragma: no cover

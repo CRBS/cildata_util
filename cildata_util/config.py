@@ -68,8 +68,6 @@ class CILDatabaseConfig(object):
         self._config.read(config_file)
 
     def _get_param(self, param):
-        if self._config is None:
-            raise CILDatabaseConfigParseError('Config is None')
 
         if not self._config.has_section(CILDatabaseConfig.POSTGRES_SECTION):
             raise CILDatabaseConfigParseError('No postgres section '
