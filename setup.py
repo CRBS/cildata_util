@@ -15,7 +15,8 @@ requirements = [
     "argparse",
     "configparser",
     "pg8000",
-    "requests"
+    "requests",
+    "jsonpickle"
 ]
 
 setup_requirements = [
@@ -26,7 +27,8 @@ test_requirements = [
     "argparse",
     "configparser",
     "pg8000",
-    "requests"
+    "requests",
+    "jsonpickle"
 ]
 
 setup(
