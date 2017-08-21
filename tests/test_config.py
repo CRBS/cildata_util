@@ -75,6 +75,40 @@ class TestConfig(unittest.TestCase):
         finally:
             shutil.rmtree(temp_dir)
 
+    def test_get_param_invalid_config(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            con = configparser.ConfigParser()
+            con.add_section(CILDatabaseConfig.POSTGRES_SECTION)
+            con.set(CILDatabaseConfig.POSTGRES_SECTION,
+                    CILDatabaseConfig.POSTGRES_USER, 'user')
+            con.set(CILDatabaseConfig.POSTGRES_SECTION,
+                    CILDatabaseConfig.POSTGRES_PASS, 'pass')
+            con.set(CILDatabaseConfig.POSTGRES_SECTION,
+                    CILDatabaseConfig.POSTGRES_HOST, 'host')
+
+            con.set(CILDatabaseConfig.POSTGRES_SECTION,
+                    CILDatabaseConfig.POSTGRES_DB, 'db')
+
+            con.set(CILDatabaseConfig.POSTGRES_SECTION,
+                    CILDatabaseConfig.POSTGRES_PORT, '5432')
+
+            cfile = os.path.join(temp_dir, 'config')
+            f = open(cfile, 'w')
+            con.write(f)
+            f.flush()
+            f.close()
+
+            dbconfig = CILDatabaseConfig(cfile)
+            try:
+                dbconfig._get_param('blah')
+                self.fail('Expected error')
+            except CILDatabaseConfigParseError as e:
+                self.assertEqual('blah not found in configuration', str(e))
+
+        finally:
+            shutil.rmtree(temp_dir)
+
     def test_valid_config(self):
         temp_dir = tempfile.mkdtemp()
         try:

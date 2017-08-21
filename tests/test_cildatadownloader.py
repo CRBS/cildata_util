@@ -26,6 +26,6 @@ class TestCildatadownloader(unittest.TestCase):
         self.assertEqual(pargs.destdir, 'somedir')
         self.assertEqual(pargs.loglevel, 'WARNING')
 
-    def test_main(self):
+    def test_main_no_config(self):
         res = cildatadownloader.main(['yo', 'dbconf', 'somedir'])
-        self.assertEqual(res, 0)
+        self.assertEqual(res, 1)
