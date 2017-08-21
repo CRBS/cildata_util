@@ -1,2 +1,9 @@
+*.pyc
+*.egg-info
+*.egg
+.eggs/
+*.pyo
+*.swp
+htmlcov/
 dist/
 build/
