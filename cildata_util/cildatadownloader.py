@@ -16,6 +16,7 @@ from cildata_util.config import CILDatabaseConfig
 from cildata_util.dbutil import Database
 from cildata_util.dbutil import CILDataFileFromDatabaseFactory
 from cildata_util.dbutil import CILDataFileJsonPickleWriter
+from cildata_util.dbutil import CILDataFileFoundInFilesystemFilter
 
 logger = logging.getLogger('cildata_util.cildatadownloader')
 
@@ -35,13 +36,16 @@ def _parse_arguments(desc, args):
                         help="Set the logging level (default WARNING)",
                         default='WARNING')
     parser.add_argument('--id', help='Only download data with id passed in.')
+    parser.add_argument('--skipifexists', action='store_true',
+                        help='Skip download if directory for id exists '
+                             'on filesystem')
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
     return parser.parse_args(args)
 
 
-def _download_file(url, dest_dir, numretries=3,
-                   retry_sleep=10):
+def _download_file(url, dest_dir, numretries=2,
+                   retry_sleep=30, timeout=30):
 
     local_filename = url.split('/')[-1]
     dest_file = os.path.join(dest_dir, local_filename)
@@ -49,7 +53,7 @@ def _download_file(url, dest_dir, numretries=3,
     retry_count = 0
     while retry_count < numretries:
         try:
-            r = requests.get(url, timeout=20, stream=True)
+            r = requests.get(url, timeout=timeout, stream=True)
 
             with open(dest_file, 'wb') as f:
                 shutil.copyfileobj(r.raw, f)
@@ -161,6 +165,16 @@ def _download_cil_data_files(theargs):
         cildatafiles = fac.get_cildatafiles()
         logger.info('Found ' + str(len(cildatafiles)) + ' entries')
 
+        if theargs.skipifexists:
+            logger.info("--skipifexists set to true. Skipping download if"
+                        " id exists on filesystem")
+            fs_cdf_filter = CILDataFileFoundInFilesystemFilter(images_destdir,
+                                                               videos_destdir)
+            filt_list = fs_cdf_filter.get_cildatafiles(cildatafiles)
+            logger.info('After filtering found ' + str(len(filt_list)) +
+                        ' entries')
+            cildatafiles = filt_list
+
         for entry in cildatafiles:
 
             logger.info('Downloading ' + str(entry.get_id()))
@@ -190,14 +204,12 @@ def _download_cil_data_files(theargs):
                                       str(last_id))
             writer.writeCILDataFileListToFile(writerfile,
                                               same_id_cdf_list)
-
-
-
     finally:
         if conn is not None:
             conn.close()
 
     return 0
+
 
 def main(args):
     """Main entry into cilfiledownloader
