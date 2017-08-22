@@ -1,3 +1,4 @@
+import os
 import logging
 import pg8000
 import jsonpickle
@@ -59,6 +60,48 @@ class CILDataFile(object):
         self._checksum = None
         self._localfile = None
         self._headers = None
+        self._file_size = None
+
+    def copy(self, cdf):
+        """Copies all values of CILDataFile passed in
+        :param cdf: CILDataFile object to copy
+        """
+        try:
+            self._is_video = cdf._is_video
+        except AttributeError:
+            pass
+        try:
+            self._mimetype = cdf._mimetype
+        except AttributeError:
+            pass
+        try:
+            self._file_name = cdf._file_name
+        except AttributeError:
+            pass
+        try:
+            self._download_success = cdf._download_success
+        except AttributeError:
+            pass
+        try:
+            self._download_time = cdf._download_time
+        except AttributeError:
+            pass
+        try:
+            self._checksum = cdf._checksum
+        except AttributeError:
+            pass
+        try:
+            self._localfile = cdf._localfile
+        except AttributeError:
+            pass
+        try:
+            self._headers = cdf._headers
+        except AttributeError:
+            pass
+        try:
+            self._file_size = cdf._file_size
+        except AttributeError:
+            pass
 
     def get_id(self):
         """Gets id
@@ -104,6 +147,16 @@ class CILDataFile(object):
         """
         self._headers = headers
 
+    def set_file_size(self, size_in_bytes):
+        """Sets size of file in bytes
+        """
+        self._file_size = size_in_bytes
+
+    def get_file_size(self):
+        """Gets size of file in bytes
+        """
+        return self._file_size
+
     def get_headers(self):
         """Gets headers obtained when
            downloading data
@@ -144,11 +197,45 @@ class CILDataFile(object):
         return self._localfile
 
 
+class CILDataFileFoundInFilesystemFilter(object):
+    """Filter that removes any CILDataFile objects
+       that already exist in the file system
+    """
+    def __init__(self, images_dir, videos_dir):
+        """
+        COnstructor
+        :param images_dir: Directory where images are stored
+        :param videos_dir: Directory where videos are stored
+        """
+        self._images_dir = images_dir
+        self._videos_dir = videos_dir
+
+    def get_cildatafiles(self, cildatafile_list):
+        """Filters out any CILDataFile objects
+           that have a presence on filesystem
+           where presence means a directory
+           exists
+        """
+        filtered_cdf_list = []
+        for cdf in cildatafile_list:
+            if cdf.get_is_video():
+                base_dir = self._videos_dir
+            else:
+                base_dir = self._images_dir
+
+            cdf_dir = os.path.join(base_dir, str(cdf.get_id()))
+            if os.path.isdir(cdf_dir):
+                continue
+
+            filtered_cdf_list.append(cdf)
+        return filtered_cdf_list
+
+
 class CILDataFileFromDatabaseFactory(object):
     """Obtains CILDataFile objects from database
     """
     IMG_SUFFIX_LIST = ['.tif', '.jpg', '.raw']
-    VID_SUFFIX_LIST = ['.flv', '.raw']
+    VID_SUFFIX_LIST = ['.flv', '.raw', '.jpg']
 
     def __init__(self, conn, id=None):
         """Constructor
@@ -247,3 +334,42 @@ class CILDataFileJsonPickleWriter(object):
         full_outfile = outfile + CILDataFileJsonPickleWriter.SUFFIX
         with open(full_outfile, 'w') as out_file:
             json.dump(json_cdf_list, out_file)
+            out_file.flush()
+
+
+class CILDataFileListFromJsonPickleFactory(object):
+    """Factory class that creates CILDataFile objects
+       by reading json pickle file
+    """
+    def __init__(self):
+        """Constructor
+        """
+        pass
+
+    def get_cildatafiles(self, json_pickle_file):
+        """Gets list of CILDataFile objects from json
+           pickle file that is expected to contain
+           a list of CILDataFile objects
+        :param json_pickle_file:
+        :return: list of CILDataFile objects
+        """
+
+        with open(json_pickle_file, 'r') as in_file:
+            data = in_file.read()
+            # this is a hack fix since CaseInsensitiveDict and
+            # OrderedDict objects within the urllib3 package
+            # is not decoding in jsonpickle
+            data = data.replace('requests.packages.urllib3.packages.ordered_dict',
+                                'collections')
+            data = data.replace('requests.structures',
+                                'collections')
+            json_cdf_list = json.loads(data)
+
+        cdf_list = []
+
+        for e in json_cdf_list:
+            tmpcdf = jsonpickle.decode(e)
+            cdf = CILDataFile(tmpcdf.get_id())
+            cdf.copy(tmpcdf)
+            cdf_list.append(cdf)
+        return cdf_list
