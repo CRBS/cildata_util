@@ -3,9 +3,136 @@ import logging
 import pg8000
 import jsonpickle
 import json
+import hashlib
+import shutil
+import requests
+import time
 
 
 logger = logging.getLogger(__name__)
+
+JSON_SUFFIX = '.json'
+
+def download_file(url, dest_dir, numretries=2,
+                   retry_sleep=30, timeout=30):
+
+    local_filename = url.split('/')[-1]
+    dest_file = os.path.join(dest_dir, local_filename)
+    logger.debug('Downloading from ' + url + ' to ' + dest_file)
+    retry_count = 0
+    while retry_count < numretries:
+        try:
+            r = requests.get(url, timeout=timeout, stream=True)
+
+            with open(dest_file, 'wb') as f:
+                shutil.copyfileobj(r.raw, f)
+            logger.debug('Headers: ' + str(r.headers))
+            return local_filename, r.headers, r.status_code
+        except Exception as e:
+            retry_count += 1
+            logger.exception('Caught some exception trying to '
+                             'download. Sleeping ' + str(retry_sleep) +
+                             ' seconds and will retry again # ' +
+                             str(retry_count))
+            time.sleep(retry_sleep)
+
+    return None, None, 999
+
+
+def get_download_url(base_url, omero_url, cdf):
+
+    if cdf.get_file_name().endswith('.flv'):
+        return base_url + 'videos/'
+
+    if cdf.get_file_name().endswith('.jpg'):
+        return base_url + 'images/download_jpeg/'
+
+    if cdf.get_file_name().endswith('.tif'):
+        return omero_url
+
+    if cdf.get_file_name().endswith('.raw'):
+        return omero_url
+    logger.error('Not sure how to download this file: ' +
+                 cdf.get_file_name())
+    return None
+
+
+def md5(fname):
+    hash_md5 = hashlib.md5()
+    logger.debug('Calculating md5 of file: ' + fname)
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
+def convert_response_headers_to_dict(headers):
+    """Converts Requests.Response headers to
+       dictionary
+    """
+    if headers is None:
+        logger.error('Headers is None')
+        return None
+
+    header_dict = {}
+    try:
+        for k in headers.keys():
+            header_dict[k] = headers[k]
+        return header_dict
+    except Exception:
+        logger.exception('Caught exception parsing headers')
+    return None
+
+
+def download_cil_data_file(destination_dir, cdf, loadbaseurl=False,
+                           download_direct_to_dest=False):
+
+    base_url = 'http://www.cellimagelibrary.org/'
+    omero_url = 'http://grackle.crbs.ucsd.edu:8080/OmeroWebService/images/'
+    str_id = str(cdf.get_id())
+
+    if download_direct_to_dest is False:
+        out_dir = os.path.join(destination_dir, str_id)
+    else:
+        out_dir = destination_dir
+
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir, mode=0o755)
+    if loadbaseurl is True:
+        # hit download page
+        logger.debug('Loading base url')
+        aurl = base_url + 'images/' + str_id
+        r = requests.get(aurl)
+        if r.status_code is not 200:
+            logger.warning('Hitting ' + aurl + ' returned status of ' +
+                           str(r.status_code))
+
+    logger.info('Downloading file: ' + cdf.get_file_name())
+    download_url = get_download_url(base_url, omero_url, cdf)
+    if download_url is None:
+        return
+
+    (local_file, headers,
+     status) = download_file(download_url +
+                             cdf.get_file_name(),
+                             out_dir)
+
+    logger.debug('status: ' + str(status))
+    if headers is not None:
+        logger.debug('content type: ' + headers['Content-Type'])
+        cdf.set_mime_type(headers['Content-Type'])
+        cdf.set_localfile(local_file)
+        cdf.set_headers(convert_response_headers_to_dict(headers))
+    if status is 200:
+        cdf.set_download_success(True)
+        cdf.set_checksum(md5(os.path.join(out_dir,
+                                          cdf.get_localfile())))
+    else:
+        logger.warning('Error downloading ' + cdf.get_file_name() +
+                       ' code: ' + str(status))
+        cdf.set_download_success(False)
+
+    return cdf
 
 
 class Database(object):
@@ -231,6 +358,38 @@ class CILDataFileFoundInFilesystemFilter(object):
         return filtered_cdf_list
 
 
+class CILDataFileFromJsonFilesFactory(object):
+    """Generates CILDataFile objects by parsing
+       json files found in directory passed in.
+    """
+    def __init__(self):
+        """Constructor
+        """
+        pass
+
+    def _get_all_json_files(self, path):
+        """Generator
+        """
+        # logger.debug('Examining ' + path)
+        if os.path.isfile(path) and path.endswith(JSON_SUFFIX):
+            # logger.debug('Yielding ' + path)
+            yield path
+        if os.path.isdir(path):
+            for entry in os.listdir(path):
+                fp = os.path.join(path, entry)
+                for subentry in self._get_all_json_files(fp):
+                    yield subentry
+
+    def get_cildatafiles(self, dir_path):
+
+        reader = CILDataFileListFromJsonPickleFactory()
+        full_list = []
+        for jsonfile in self._get_all_json_files(dir_path):
+            for entry in reader.get_cildatafiles(jsonfile):
+                full_list.append(entry)
+        return full_list
+
+
 class CILDataFileFromDatabaseFactory(object):
     """Obtains CILDataFile objects from database
     """
@@ -321,7 +480,8 @@ class CILDataFileJsonPickleWriter(object):
         pass
 
     def writeCILDataFileListToFile(self, outfile,
-                                   cildatafile_list):
+                                   cildatafile_list,
+                                   skipsuffixappend=False):
 
         """Writes CILDataFile objects in list to a file
            in json format
@@ -331,7 +491,11 @@ class CILDataFileJsonPickleWriter(object):
             json_cdf_list.append(jsonpickle.encode(cdf))
 
         logger.debug('Writing out json file to ' + outfile)
-        full_outfile = outfile + CILDataFileJsonPickleWriter.SUFFIX
+        if skipsuffixappend is False:
+            full_outfile = outfile + CILDataFileJsonPickleWriter.SUFFIX
+        else:
+            full_outfile = outfile
+
         with open(full_outfile, 'w') as out_file:
             json.dump(json_cdf_list, out_file)
             out_file.flush()
@@ -341,10 +505,26 @@ class CILDataFileListFromJsonPickleFactory(object):
     """Factory class that creates CILDataFile objects
        by reading json pickle file
     """
-    def __init__(self):
+    def __init__(self, fixheaders=False):
         """Constructor
         """
-        pass
+        self._fixheaders = fixheaders
+
+    def _get_fixed_header(self, header):
+        """Fixes messed up header object
+        """
+        if header is None:
+            return None
+        try:
+            header_dict = {}
+            for bkey in header['_store'].keys():
+                if bkey == 'py/object':
+                    continue
+                header_dict[header['_store'][bkey]['py/tuple'][0]] = header['_store'][bkey]['py/tuple'][1]
+            return header_dict
+        except KeyError:
+            logger.exception('Got a key error maybe this json has been fixed')
+            return header
 
     def get_cildatafiles(self, json_pickle_file):
         """Gets list of CILDataFile objects from json
@@ -371,5 +551,9 @@ class CILDataFileListFromJsonPickleFactory(object):
             tmpcdf = jsonpickle.decode(e)
             cdf = CILDataFile(tmpcdf.get_id())
             cdf.copy(tmpcdf)
+
+            if self._fixheaders is True:
+                cdf.set_headers(self._get_fixed_header(cdf.get_headers()))
+
             cdf_list.append(cdf)
         return cdf_list
