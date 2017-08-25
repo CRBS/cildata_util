@@ -130,7 +130,6 @@ class TestDbutil(unittest.TestCase):
         cdf.set_mime_type('mimetype')
         cdf.set_headers(['hi'])
         cdf.set_file_size(123)
-
         cdf_list = []
         cdf_list.append(cdf)
 
@@ -155,9 +154,19 @@ class TestDbutil(unittest.TestCase):
         finally:
             shutil.rmtree(temp_dir)
 
-    # def test_read_old_json(self):
-    #    reader = CILDataFileListFromJsonPickleFactory()
+"""
+    def test_read_old_json_and_write_and_read(self):
+        reader = CILDataFileListFromJsonPickleFactory()
         # cdf_list = reader.get_cildatafiles('/home/churas/src/CIL_file_download_tool/39602.json')
-        # cdf_list = reader.get_cildatafiles('/home/churas/tasks/cil_downloader/out/images/10001/10001.json')
-        # self.assertEqual(cdf_list[0].get_file_size(), None)
-        # self.assertEqual(cdf_list[0].get_headers()['_store']['content-type']['py/tuple'][1], 'image/tif')
+        cdf_list = reader.get_cildatafiles('/home/churas/tasks/cil_downloader/out/images/10001/10001.json')
+        self.assertEqual(cdf_list[0].get_file_size(), None)
+        self.assertEqual(str(cdf_list[0].get_headers()), "{u'Content-disposition': u'attachment; filename=10001.tif', u'Transfer-Encoding': u'chunked', u'Server': u'Jetty(6.1.18)', u'Connection': u'close', u'Date': u'Mon, 21 Aug 2017 22:20:40 GMT', u'Content-Type': u'image/tif'}")
+
+        writer = CILDataFileJsonPickleWriter()
+        writer.writeCILDataFileListToFile('/home/churas/yo', cdf_list)
+
+        newcdf_list = reader.get_cildatafiles('/home/churas/yo.json')
+        self.assertEqual(newcdf_list[0].get_file_size(), None)
+        self.assertEqual(str(newcdf_list[0].get_headers()), "{u'Content-disposition': u'attachment; filename=10001.tif', u'Transfer-Encoding': u'chunked', u'Server': u'Jetty(6.1.18)', u'Connection': u'close', u'Date': u'Mon, 21 Aug 2017 22:20:40 GMT', u'Content-Type': u'image/tif'}")
+"""
+
