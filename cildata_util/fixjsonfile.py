@@ -5,17 +5,13 @@ import argparse
 import sys
 import logging
 import os
-import requests
-import shutil
-import time
-import hashlib
+
 
 import cildata_util
+from cildata_util import dbutil
 from cildata_util import config
-from cildata_util.dbutil import CILDataFileFromDatabaseFactory
 from cildata_util.dbutil import CILDataFileListFromJsonPickleFactory
 from cildata_util.dbutil import CILDataFileJsonPickleWriter
-from cildata_util.dbutil import CILDataFileFoundInFilesystemFilter
 
 logger = logging.getLogger('cildata_util.fixjsonfile')
 
@@ -39,17 +35,31 @@ def _parse_arguments(desc, args):
 
 
 def _fix_json_file(theargs):
-    if os.path.isfile(theargs.jsonfile + '.orig'):
-        logger.warning(theargs.jsonfile + '.orig exists already. skipping...')
-        return
-
-    reader = CILDataFileListFromJsonPickleFactory(fixheaders=True)
+    reader = CILDataFileListFromJsonPickleFactory()
     cdf_list = reader.get_cildatafiles(theargs.jsonfile)
-    shutil.copy(theargs.jsonfile, theargs.jsonfile + '.orig')
-    writer = CILDataFileJsonPickleWriter()
-    writer.writeCILDataFileListToFile(theargs.jsonfile,
-                                      cdf_list,
-                                      skipsuffixappend=True)
+    abs_json_path = os.path.abspath(theargs.jsonfile)
+    json_dir = os.path.dirname(abs_json_path)
+    updated = False
+    for cdf in cdf_list:
+        if cdf.get_file_size() is None:
+            local_file_fp = os.path.join(json_dir,
+                                         cdf.get_file_name())
+            if not os.path.isfile(local_file_fp):
+                logger.warning(local_file_fp + ' file not found. '
+                                               'Skipping update')
+                continue
+            logger.debug('Updating size for file: ' + local_file_fp)
+            cdf.set_file_size(os.path.getsize(local_file_fp))
+            updated = True
+
+    if updated is True:
+        logger.debug('Updating json file ' + theargs.jsonfile)
+        dbutil.make_backup_of_json(theargs.jsonfile)
+
+        writer = CILDataFileJsonPickleWriter()
+        writer.writeCILDataFileListToFile(theargs.jsonfile,
+                                          cdf_list,
+                                          skipsuffixappend=True)
     return 0
 
 def main(args):
