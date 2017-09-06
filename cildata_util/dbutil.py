@@ -13,8 +13,18 @@ logger = logging.getLogger(__name__)
 
 JSON_SUFFIX = '.json'
 
+
+def make_backup_of_json(jsonfile):
+    cntr = 0
+    backupfile = jsonfile + '.bk.' + str(cntr)
+    while os.path.isfile(backupfile):
+        backupfile = jsonfile + '.bk.' + str(cntr)
+        cntr += 1
+    shutil.copy(jsonfile, backupfile)
+
+
 def download_file(url, dest_dir, numretries=2,
-                   retry_sleep=30, timeout=30):
+                   retry_sleep=30, timeout=120):
 
     local_filename = url.split('/')[-1]
     dest_file = os.path.join(dest_dir, local_filename)
@@ -125,8 +135,9 @@ def download_cil_data_file(destination_dir, cdf, loadbaseurl=False,
         cdf.set_headers(convert_response_headers_to_dict(headers))
     if status is 200:
         cdf.set_download_success(True)
-        cdf.set_checksum(md5(os.path.join(out_dir,
-                                          cdf.get_localfile())))
+        local_file_fp = os.path.join(out_dir, cdf.get_localfile())
+        cdf.set_checksum(md5(local_file_fp))
+        cdf.set_file_size(os.path.getsize(local_file_fp))
     else:
         logger.warning('Error downloading ' + cdf.get_file_name() +
                        ' code: ' + str(status))

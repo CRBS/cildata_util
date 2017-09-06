@@ -52,15 +52,6 @@ def _find_json_file(dataset_dir):
     return None
 
 
-def _make_backup_of_json(jsonfile):
-    cntr = 0
-    backupfile = jsonfile + '.bk.' + str(cntr)
-    while os.path.isfile(backupfile):
-        backupfile = jsonfile + '.bk.' + str(cntr)
-        cntr += 1
-    shutil.copy(jsonfile, backupfile)
-
-
 def _add_missing_cildatafile_objects(cdf_list):
     """Adds any missing CILDataFile objects
     """
@@ -124,7 +115,7 @@ def _checkdownload(theargs):
 
     if updated is True and theargs.dryrun is False:
         logger.info('Making backup of json and writing updated version of json')
-        _make_backup_of_json(jsonfile)
+        dbutil.make_backup_of_json(jsonfile)
         writer = CILDataFileJsonPickleWriter()
         writer.writeCILDataFileListToFile(jsonfile,
                                           newcdf_list,
