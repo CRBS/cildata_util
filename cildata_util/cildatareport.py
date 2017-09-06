@@ -41,14 +41,21 @@ def _generate_report(theargs):
     counter = 0
     mimetypes = {}
     failed_count = 0
+    failed_list = []
+    failed_id_hash = {}
     for cdf in factory.get_cildatafiles(download_dir):
+        if cdf.get_id() not in failed_id_hash:
+            failed_id_hash[cdf.get_id()] = False
+
         if cdf.get_mime_type() not in mimetypes:
             mimetypes[cdf.get_mime_type()] = 1
         else:
             mimetypes[cdf.get_mime_type()] += 1
         counter += 1
         if cdf.get_download_success() is False:
+            failed_id_hash[cdf.get_id()] = True
             failed_count += 1
+            failed_list.append(cdf)
             if cdf.get_mime_type() is not None and cdf.get_mime_type().startswith('text'):
                 logger.debug('Failed and type is text: ' + cdf.get_file_name())
         else:
@@ -58,8 +65,18 @@ def _generate_report(theargs):
                 if cdf.get_mime_type().startswith('text'):
                     logger.debug('Success, but type is text: ' + cdf.get_file_name())
 
+    for entry in failed_list:
+        sys.stdout.write(entry.get_file_name() + '\n')
+
     sys.stdout.write('# entries: ' + str(counter) + '\n')
     sys.stdout.write('# failed: ' + str(failed_count) + '\n')
+
+    num_ids = len(failed_id_hash.keys())
+    failedcnt = 0
+    for entry in failed_id_hash.keys():
+        if failed_id_hash[entry] is True:
+            failedcnt += 1
+    sys.stdout.write('# ids ' + str(num_ids) + ' and # failed: ' + str(failedcnt) + '\n')
 
     sys.stdout.write('-----------------\n')
     for entry in mimetypes.keys():
