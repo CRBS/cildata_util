@@ -5,14 +5,8 @@ import argparse
 import sys
 import logging
 import os
-import shutil
-import re
 import cildata_util
-from cildata_util import dbutil
 from cildata_util import config
-from cildata_util.dbutil import CILDataFile
-from cildata_util.dbutil import CILDataFileListFromJsonPickleFactory
-from cildata_util.dbutil import CILDataFileJsonPickleWriter
 from cildata_util.dbutil import CILDataFileFromJsonFilesFactory
 
 logger = logging.getLogger('cildata_util.cildatareport')
