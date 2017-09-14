@@ -12,13 +12,20 @@ import time
 logger = logging.getLogger(__name__)
 
 JSON_SUFFIX = '.json'
+BK_TXT = '.bk.'
 
 
 def make_backup_of_json(jsonfile):
+    """Makes copy of file by appending .bk.# where
+       # is one whole number higher then the highest
+       number found in directory.
+       :raises IOError: If `jsonfile` does not exist
+       :raises OSError: Can also be raised if there is a copy problem
+    """
     cntr = 0
-    backupfile = jsonfile + '.bk.' + str(cntr)
+    backupfile = jsonfile + BK_TXT + str(cntr)
     while os.path.isfile(backupfile):
-        backupfile = jsonfile + '.bk.' + str(cntr)
+        backupfile = jsonfile + BK_TXT + str(cntr)
         cntr += 1
     shutil.copy(jsonfile, backupfile)
 
@@ -68,6 +75,18 @@ def get_download_url(base_url, omero_url, cdf):
 
 
 def md5(fname):
+    """Calculates md5 hash on file passed in
+    :param fname: file to examine
+    :returns: None if no file is passed in or if file does
+              not exist otherwise md5hash hexdigest()
+    """
+    if fname is None:
+        return None
+
+    if not os.path.isfile(fname):
+        logger.error(fname + ' is not a file')
+        return None
+
     hash_md5 = hashlib.md5()
     logger.debug('Calculating md5 of file: ' + fname)
     with open(fname, "rb") as f:
@@ -502,7 +521,6 @@ class CILDataFileFromDatabaseFactory(object):
 class CILDataFileJsonPickleWriter(object):
     """Persists CILDataFile objects to a file using jsonpickle
     """
-    SUFFIX = '.json'
     def __init__(self):
         """Constructor
         """
@@ -521,7 +539,7 @@ class CILDataFileJsonPickleWriter(object):
 
         logger.debug('Writing out json file to ' + outfile)
         if skipsuffixappend is False:
-            full_outfile = outfile + CILDataFileJsonPickleWriter.SUFFIX
+            full_outfile = outfile + JSON_SUFFIX
         else:
             full_outfile = outfile
 
