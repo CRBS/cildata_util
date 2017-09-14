@@ -199,6 +199,7 @@ class CILDataFile(object):
         self._localfile = None
         self._headers = None
         self._file_size = None
+        self._has_raw = None
 
     def copy(self, cdf):
         """Copies all values of CILDataFile passed in
@@ -238,6 +239,10 @@ class CILDataFile(object):
             pass
         try:
             self._file_size = cdf._file_size
+        except AttributeError:
+            pass
+        try:
+            self._has_raw = cdf._has_raw
         except AttributeError:
             pass
 
@@ -289,6 +294,16 @@ class CILDataFile(object):
         """Sets size of file in bytes
         """
         self._file_size = size_in_bytes
+
+    def set_has_raw(self, has_raw_val):
+        """Sets has_raw
+        """
+        self._has_raw = has_raw_val
+
+    def get_has_raw(self):
+        """Gets has_raw
+        """
+        return self._has_raw
 
     def get_file_size(self):
         """Gets size of file in bytes
@@ -433,6 +448,7 @@ class CILDataFileFromDatabaseFactory(object):
                         counter = 1
                     else:
                         newcdf = CILDataFile(cur_id)
+                        newcdf.copy(cdf)
                         newcdf.set_is_video(True)
 
                     newcdf.set_file_name(str(cur_id) + suffix)
@@ -446,7 +462,7 @@ class CILDataFileFromDatabaseFactory(object):
                         counter = 1
                     else:
                         newcdf = CILDataFile(cur_id)
-
+                    newcdf.copy(cdf)
                     newcdf.set_file_name(str(cur_id) + suffix)
                     newcdflist.append(newcdf)
 
@@ -467,12 +483,14 @@ class CILDataFileFromDatabaseFactory(object):
             else:
                 idfilter = ''
             cursor.execute("SELECT replace(image_id,'CIL_', '') as image_id,"
-                           "is_video from cil_data_type where is_public=true" +
+                           "is_video, has_raw from cil_data_type where is_public=true" +
                            idfilter)
 
             for entry in cursor.fetchall():
                 cdf = CILDataFile(entry[0])
                 cdf.set_is_video(bool(entry[1]))
+                cdf.set_has_raw(bool(entry[2]))
+
                 cildatafiles.append(cdf)
         finally:
             cursor.close()
