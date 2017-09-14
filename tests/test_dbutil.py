@@ -11,6 +11,7 @@ import unittest
 import configparser
 import time
 
+from cildata_util import dbutil
 from cildata_util.dbutil import Database
 from cildata_util.dbutil import CILDataFile
 from cildata_util.dbutil import CILDataFileJsonPickleWriter
@@ -29,6 +30,101 @@ class TestDbutil(unittest.TestCase):
 
     def tearDown(self):
         """Tear down test fixtures, if any."""
+
+    def test_make_backup_of_json_with_nonexistant_file(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            # try where files does not exist
+            not_exist = os.path.join(temp_dir, 'foo')
+            dbutil.make_backup_of_json(not_exist)
+        except IOError as e:
+            self.assertTrue('No such file' in str(e))
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_make_backup_of_json(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            somefile = os.path.join(temp_dir,'somefile.json')
+            with open(somefile, 'w') as f:
+                f.write('hi\n')
+                f.flush()
+
+            dbutil.make_backup_of_json(somefile)
+            self.assertTrue(os.path.isfile(somefile))
+            self.assertTrue(os.path.isfile(somefile + dbutil.BK_TXT + '0'))
+            self.assertFalse(os.path.isfile(somefile + dbutil.BK_TXT + '1'))
+
+            dbutil.make_backup_of_json(somefile)
+            self.assertTrue(os.path.isfile(somefile))
+            self.assertTrue(os.path.isfile(somefile + dbutil.BK_TXT + '0'))
+            self.assertTrue(os.path.isfile(somefile + dbutil.BK_TXT + '1'))
+
+            with open(somefile, 'w') as f:
+                f.write('bye\n')
+                f.flush()
+            dbutil.make_backup_of_json(somefile)
+            self.assertTrue(os.path.isfile(somefile))
+            self.assertTrue(os.path.isfile(somefile + dbutil.BK_TXT + '0'))
+            self.assertTrue(os.path.isfile(somefile + dbutil.BK_TXT + '1'))
+            self.assertTrue(os.path.isfile(somefile + dbutil.BK_TXT + '2'))
+
+            with open(somefile + dbutil.BK_TXT + '2', 'r') as f:
+                self.assertEqual(f.read(), 'bye\n')
+
+            with open(somefile + dbutil.BK_TXT + '2', 'r') as f:
+                self.assertEqual(f.read(), 'bye\n')
+
+            with open(somefile + dbutil.BK_TXT + '1', 'r') as f:
+                self.assertEqual(f.read(), 'hi\n')
+
+            with open(somefile + dbutil.BK_TXT + '0', 'r') as f:
+                self.assertEqual(f.read(), 'hi\n')
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_md5(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            self.assertEqual(dbutil.md5(None), None)
+            self.assertEqual(dbutil.md5(temp_dir), None)
+
+            not_exist = os.path.join(temp_dir, 'foo')
+            self.assertEqual(dbutil.md5(not_exist), None)
+
+            emptyfile = os.path.join(temp_dir, 'empty')
+            open(emptyfile, 'a').close()
+            self.assertEqual(dbutil.md5(emptyfile),
+                             'd41d8cd98f00b204e9800998ecf8427e')
+            somefile = os.path.join(temp_dir, 'somefile.json')
+            with open(somefile, 'w') as f:
+                f.write('hi\n')
+                f.flush()
+            self.assertEqual(dbutil.md5(somefile),
+                             '764efa883dda1e11db47671c4a3bbd9e')
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_download_file_num_retries_negative(self):
+        self.assertEqual(dbutil.download_file('foo','/tmp', numretries=-1),
+                         (None, None, 999))
+
+    def test_download_file_with_valid_local_file(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            somefile = os.path.join(temp_dir, 'somefile.json')
+            print somefile
+            with open(somefile, 'w') as f:
+                f.write('hi\n')
+                f.flush()
+            dest = os.path.join(temp_dir, 'downloaded')
+            fname, headers, status = dbutil.download_file('file://' + somefile,
+                                                          dest, numretries=0,
+                                                          retry_sleep=0,
+                                                          timeout=0)
+            self.assertEqual(fname, 'gotta fix this')
+        finally:
+            shutil.rmtree(temp_dir)
 
     def test_database_get_alternate_connection(self):
         db = Database(None)
@@ -111,7 +207,7 @@ class TestDbutil(unittest.TestCase):
             writer.writeCILDataFileListToFile(outfile, cdf_list)
             reader = CILDataFileListFromJsonPickleFactory()
 
-            suffixoutfile = outfile + CILDataFileJsonPickleWriter.SUFFIX
+            suffixoutfile = outfile + dbutil.JSON_SUFFIX
             res_list = reader.get_cildatafiles(suffixoutfile)
 
             self.assertEqual(res_list[0].get_id(), cdf_list[0].get_id())
@@ -142,7 +238,7 @@ class TestDbutil(unittest.TestCase):
             writer.writeCILDataFileListToFile(outfile, cdf_list)
             reader = CILDataFileListFromJsonPickleFactory()
 
-            suffixoutfile = outfile + CILDataFileJsonPickleWriter.SUFFIX
+            suffixoutfile = outfile + dbutil.JSON_SUFFIX
             res_list = reader.get_cildatafiles(suffixoutfile)
 
             self.assertEqual(res_list[0].get_id(), cdf_list[0].get_id())
