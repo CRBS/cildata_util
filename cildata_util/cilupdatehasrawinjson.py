@@ -7,6 +7,7 @@ import logging
 import os
 import cildata_util
 from cildata_util import config
+from cildata_util import dbutil
 from cildata_util.config import CILDatabaseConfig
 from cildata_util.dbutil import Database
 from cildata_util.dbutil import CILDataFileFromDatabaseFactory
@@ -38,77 +39,104 @@ def _parse_arguments(desc, args):
     return parser.parse_args(args)
 
 
-def _update_cil_data_files(theargs):
-    """Does the download"""
-    download_dir = os.path.abspath(theargs.downloaddir)
-    factory = CILDataFileFromJsonFilesFactory()
+def _get_cildatafiles_from_database(theargs):
+    """Queries database for a list of CILDataFile objects
+    """
     logger.debug('Reading database config')
     dbconf = CILDatabaseConfig(theargs.databaseconf)
     db = Database(dbconf)
     logger.debug('Getting database connection')
-    abs_destdir = os.path.abspath(theargs.downloaddir)
-    images_destdir = os.path.join(abs_destdir, 'images')
     conn = None
-    reader = CILDataFileListFromJsonPickleFactory()
-    writer = CILDataFileJsonPickleWriter()
     try:
-
         conn = db.get_connection()
         fac = CILDataFileFromDatabaseFactory(conn)
         cildatafiles = fac.get_cildatafiles()
         logger.info('Found ' + str(len(cildatafiles)) + ' entries')
-
-        # build hash table
-        cildatafile_hash = {}
-        for entry in cildatafiles:
-            if entry.get_file_name().endswith('.raw'):
-                cildatafile_hash[entry.get_file_name()] = entry
-
-        no_raw_counter = 0
-        for entry in os.listdir(images_destdir):
-            fp = os.path.join(images_destdir, entry)
-            if not os.path.isdir(fp):
-                continue
-
-            rewrite_cdflist = False
-            cdf_list = factory.get_cildatafiles(fp)
-
-            for cdf in cdf_list:
-                if theargs.id is not None:
-                    if theargs.id == str(cdf.get_id()):
-                        logger.info('Id matches!!!!')
-                        rewrite_cdflist = False
-
-                        break
-
-                if cdf.get_file_name() not in cildatafile_hash:
-                    continue
-                db_cdf = cildatafile_hash[cdf.get_file_name()]
-
-                if db_cdf.get_has_raw() is None:
-                    logger.error(cdf.get_file_name() + ' has raw is None')
-                    break
-
-                if db_cdf.get_has_raw() == True:
-                    break
-
-                cdf.set_has_raw(db_cdf.get_has_raw())
-                # logger.debug(cdf.get_file_name() + ' has raw is ' +
-                #             str(cdf.get_has_raw()))
-                no_raw_counter += 1
-                rewrite_cdflist = True
-                break
-
-            if rewrite_cdflist is True:
-                logger.info('Rewriting cdf list file in this directory' + fp)
-
-        logger.info('Found ' + str(no_raw_counter) + ' raw entries that'
-                                                     'are NOT supposed'
-                                                     ' to have raw files')
+        return cildatafiles
     finally:
         if conn is not None:
             conn.close()
+    return None
 
+
+def _get_hashof_cildatafiles_by_file_name(cildatafiles):
+    """Creates a dictionary from list of CILDataFile objects
+       passed in by setting key to
+       CILDataFile.get_file_name() and value
+       set to the CILDataFile object. NOTE: Only entries
+       that end with .raw are put into the hash. The other
+       entries are ignored.
+       :param cildatafiles: list of CILDataFile objects
+       :returns: dictionary of CILDataFile objects
+    """
+    cildatafile_hash = {}
+    for entry in cildatafiles:
+            cildatafile_hash[entry.get_file_name()] = entry
+    return cildatafile_hash
+
+
+def _update_cil_data_files_for_id(cdf_list, cildatafile_hash):
+    """Using hash updates a CILDataFile objects in cdf_list
+    :param cdf_list: list of CILDataFile objects that belong to
+                     same id
+    :param cildatafile_hash: dictionary [get_file_name()] => CILDataFile
+    :returns: tuple (cdf_list, boolean to denote if updated)
+    """
+    update_needed = False
+    for cdf in cdf_list:
+        if cdf.get_file_name() not in cildatafile_hash:
+            continue
+        db_cdf = cildatafile_hash[cdf.get_file_name()]
+
+        if cdf.get_has_raw() != db_cdf.get_has_raw():
+            update_needed = True
+            cdf.set_has_raw(db_cdf.get_has_raw())
+    return cdf_list, update_needed
+
+
+def _update_cil_data_files(theargs):
+    cildatafiles = _get_cildatafiles_from_database(theargs)
+    if cildatafiles is None:
+        logger.error('No CILDataFiles obtained from database')
+        return 1
+    cildatafile_hash = _get_hashof_cildatafiles_by_file_name(cildatafiles)
+
+    if len(cildatafile_hash) is 0:
+        logger.error('Hash of CILDataFile objects is empty')
+        return 2
+
+    return _write_updated_cil_data_files(theargs, cildatafile_hash)
+
+
+def _write_updated_cil_data_files(theargs, cildatafile_hash):
+    """Does the download"""
+    download_dir = os.path.abspath(theargs.downloaddir)
+    factory = CILDataFileFromJsonFilesFactory()
+    abs_destdir = os.path.abspath(theargs.downloaddir)
+    images_destdir = os.path.join(abs_destdir, 'images')
+    reader = CILDataFileListFromJsonPickleFactory()
+    writer = CILDataFileJsonPickleWriter()
+
+    no_raw_counter = 0
+    for entry in os.listdir(images_destdir):
+        fp = os.path.join(images_destdir, entry)
+        if not os.path.isdir(fp):
+            continue
+
+        cdf_list = factory.get_cildatafiles(fp)
+        if theargs.id is not None:
+            if theargs.id != str(cdf_list[0].get_id()):
+                continue
+
+        cdf_list, rewrite = _update_cil_data_files_for_id(cdf_list,
+                                                          cildatafile_hash)
+        if rewrite is True:
+            logger.info('Rewriting cdf list file in this directory ' + fp)
+            theid = os.path.basename(fp)
+            json_file = os.path.join(fp, theid + dbutil.JSON_SUFFIX)
+            dbutil.make_backup_of_json(json_file)
+            writer.writeCILDataFileListToFile(json_file, cdf_list,
+                                              skipsuffixappend=True)
     return 0
 
 
