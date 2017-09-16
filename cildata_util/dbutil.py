@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 JSON_SUFFIX = '.json'
 BK_TXT = '.bk.'
+RAW_SUFFIX = '.raw'
 
 
 def make_backup_of_json(jsonfile):
@@ -31,15 +32,28 @@ def make_backup_of_json(jsonfile):
 
 
 def download_file(url, dest_dir, numretries=2,
-                   retry_sleep=30, timeout=120):
-
+                   retry_sleep=30, timeout=120,
+                  session=None):
+    """Downloads file from `url` to `dest_dir` path
+    :param url: URL to download ie http://foo.com/file
+    :param numretries: Number of retries, default 2
+    :param retry_sleep: Seconds to sleep between retries, default 30
+    :param timeout: Seconds before timeout, default 120
+    :param session: Allows caller to use custom Requests.session to
+                    retrieve file, default None to use requests.get
+    :returns: tuple (local filename, requests.headers, requests.status_code)
+    """
     local_filename = url.split('/')[-1]
     dest_file = os.path.join(dest_dir, local_filename)
     logger.debug('Downloading from ' + url + ' to ' + dest_file)
     retry_count = 0
     while retry_count < numretries:
         try:
-            r = requests.get(url, timeout=timeout, stream=True)
+            if session is not None:
+                logger.debug('Using custom session object for get')
+                r = session.get(url, timeout=timeout, stream=True)
+            else:
+                r = requests.get(url, timeout=timeout, stream=True)
 
             with open(dest_file, 'wb') as f:
                 shutil.copyfileobj(r.raw, f)
@@ -399,6 +413,31 @@ class CILDataFileFoundInFilesystemFilter(object):
             if os.path.isdir(cdf_dir):
                 continue
 
+            filtered_cdf_list.append(cdf)
+        return filtered_cdf_list
+
+
+class CILDataFileNoRawFilter(object):
+    """Filter that removes any CILDataFile image objects
+       that end with .raw and whose get_has_raw() is
+       set to False
+    """
+    def __init__(self):
+        """
+        COnstructor
+        """
+
+    def get_cildatafiles(self, cildatafile_list):
+        """Filters out any CILDataFile objects as described
+           in constructor.
+        """
+        filtered_cdf_list = []
+        for cdf in cildatafile_list:
+            if cdf.get_is_video() is not True:
+                if cdf.get_file_name().endswith(RAW_SUFFIX):
+                    if cdf.get_has_raw() is False:
+                        logger.debug('Skipping entry: ' + cdf.get_file_name())
+                        continue
             filtered_cdf_list.append(cdf)
         return filtered_cdf_list
 
