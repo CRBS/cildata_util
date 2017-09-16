@@ -8,6 +8,7 @@ import os
 import cildata_util
 from cildata_util import config
 from cildata_util.dbutil import CILDataFileFromJsonFilesFactory
+from cildata_util.dbutil import CILDataFileNoRawFilter
 
 logger = logging.getLogger('cildata_util.cildatareport')
 
@@ -24,6 +25,9 @@ def _parse_arguments(desc, args):
                         'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help="Set the logging level (default WARNING)",
                         default='WARNING')
+    parser.add_argument("--skiprawfalse", action='store_true',
+                        help='If set dont count .raw file entries '
+                             'where has raw is false')
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
     return parser.parse_args(args)
@@ -37,21 +41,33 @@ def _generate_report(theargs):
     failed_count = 0
     failed_list = []
     failed_id_hash = {}
-    for cdf in factory.get_cildatafiles(download_dir):
-        if cdf.get_id() not in failed_id_hash:
-            failed_id_hash[cdf.get_id()] = False
+    unique_ids = {}
+    not_supposed_to_have_raw = 0
+    noraw_filt = CILDataFileNoRawFilter()
+    cdf_list = factory.get_cildatafiles(download_dir)
+    logger.info('Unfiltered list count: ' + str(len(cdf_list)))
 
-        if cdf.get_mime_type() not in mimetypes:
-            mimetypes[cdf.get_mime_type()] = 1
-        else:
-            mimetypes[cdf.get_mime_type()] += 1
+    if theargs.skiprawfalse is True:
+        filt_cdf_list = noraw_filt.get_cildatafiles(cdf_list)
+        logger.info('Skipped raw without download count: ' +
+                    str(len(filt_cdf_list)))
+        not_supposed_to_have_raw = len(cdf_list) - len(filt_cdf_list)
+    else:
+        filt_cdf_list = cdf_list
+
+    for cdf in filt_cdf_list:
+        unique_ids[cdf.get_id()] = 1
         counter += 1
         if cdf.get_download_success() is False:
+            # if cdf.get_file_name().endswith('.raw'):
+            #    if cdf.get_has_raw() is False:
+            #        logger.debug(cdf.get_file_name() + ' no raw, but is raw file')
+            #        not_supposed_to_have_raw += 1
+            #        continue
             failed_id_hash[cdf.get_id()] = True
+            sys.stdout.write(cdf.get_file_name() + '\n')
             failed_count += 1
             failed_list.append(cdf)
-            if cdf.get_mime_type() is not None and cdf.get_mime_type().startswith('text'):
-                logger.debug('Failed and type is text: ' + cdf.get_file_name())
         else:
             if cdf.get_mime_type() is None:
                 logger.debug(cdf.get_file_name() + 'mime type is None')
@@ -59,19 +75,20 @@ def _generate_report(theargs):
                 if cdf.get_mime_type().startswith('text'):
                     logger.debug('Success, but type is text: ' + cdf.get_file_name())
 
-    for entry in failed_list:
-        sys.stdout.write(entry.get_file_name() + '\n')
+        if cdf.get_mime_type() not in mimetypes:
+            mimetypes[cdf.get_mime_type()] = 1
+        else:
+            mimetypes[cdf.get_mime_type()] += 1
 
-    sys.stdout.write('# entries: ' + str(counter) + '\n')
-    sys.stdout.write('# failed: ' + str(failed_count) + '\n')
+    num_unique_ids = len(unique_ids.keys())
+    num_failed_ids = len(failed_id_hash.keys())
+    sys.stdout.write('\n')
+    sys.stdout.write('Number entries: ' + str(counter) + ' (failed: ' + str(failed_count) + ')\n')
+    sys.stdout.write('Number unique IDs: ' + str(num_unique_ids) + ' (failed: ' + str(num_failed_ids) + ')\n')
 
-    num_ids = len(failed_id_hash.keys())
-    failedcnt = 0
-    for entry in failed_id_hash.keys():
-        if failed_id_hash[entry] is True:
-            failedcnt += 1
-    sys.stdout.write('# ids ' + str(num_ids) + ' and # failed: ' + str(failedcnt) + '\n')
-
+    if theargs.skiprawfalse is True:
+        sys.stdout.write('Number entries that are NOT supposed to have raw file: ' +
+                         str(not_supposed_to_have_raw) + '\n')
     sys.stdout.write('-----------------\n')
     for entry in mimetypes.keys():
         sys.stdout.write('\t' + str(entry) + ' ==> ' + str(mimetypes[entry]) + '\n')
