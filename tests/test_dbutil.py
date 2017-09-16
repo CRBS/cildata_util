@@ -5,11 +5,8 @@
 
 import os
 import tempfile
-import logging
 import shutil
 import unittest
-import configparser
-import time
 
 from cildata_util import dbutil
 from cildata_util.dbutil import Database
@@ -21,6 +18,9 @@ class FakeCILDataFile(object):
     """Fake object
     """
     pass
+
+
+
 
 class TestDbutil(unittest.TestCase):
     """Tests for `cildatadownloader` package."""
@@ -109,23 +109,6 @@ class TestDbutil(unittest.TestCase):
         self.assertEqual(dbutil.download_file('foo','/tmp', numretries=-1),
                          (None, None, 999))
 
-    def test_download_file_with_valid_local_file(self):
-        temp_dir = tempfile.mkdtemp()
-        try:
-            somefile = os.path.join(temp_dir, 'somefile.json')
-            print somefile
-            with open(somefile, 'w') as f:
-                f.write('hi\n')
-                f.flush()
-            dest = os.path.join(temp_dir, 'downloaded')
-            fname, headers, status = dbutil.download_file('file://' + somefile,
-                                                          dest, numretries=0,
-                                                          retry_sleep=0,
-                                                          timeout=0)
-            self.assertEqual(fname, 'gotta fix this')
-        finally:
-            shutil.rmtree(temp_dir)
-
     def test_database_get_alternate_connection(self):
         db = Database(None)
         db.set_alternate_connection('hi')
@@ -151,6 +134,7 @@ class TestDbutil(unittest.TestCase):
         self.assertEqual(cdf.get_headers(), None)
         self.assertEqual(cdf.get_file_size(), None)
         self.assertEqual(cdf.get_localfile(), None)
+        self.assertEqual(cdf.get_has_raw(), None)
 
         cdf.set_checksum('123')
         cdf.set_download_success(True)
@@ -161,6 +145,7 @@ class TestDbutil(unittest.TestCase):
         cdf.set_headers(['hi'])
         cdf.set_file_size(123)
         cdf.set_localfile('local')
+        cdf.set_has_raw(False)
 
         self.assertEqual(cdf.get_id(), 1)
         self.assertEqual(cdf.get_checksum(), '123')
@@ -172,6 +157,7 @@ class TestDbutil(unittest.TestCase):
         self.assertEqual(cdf.get_headers(), ['hi'])
         self.assertEqual(cdf.get_file_size(), 123)
         self.assertEqual(cdf.get_localfile(), 'local')
+        self.assertEqual(cdf.get_has_raw(), False)
 
     def test_cildatafile_copy(self):
         fakecdf = FakeCILDataFile()
