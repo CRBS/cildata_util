@@ -13,6 +13,7 @@ from cildata_util.dbutil import Database
 from cildata_util.dbutil import CILDataFileFromDatabaseFactory
 from cildata_util.dbutil import CILDataFileJsonPickleWriter
 from cildata_util.dbutil import CILDataFileFoundInFilesystemFilter
+from cildata_util.dbutil import CILDataFileNoRawFilter
 
 logger = logging.getLogger('cildata_util.cildatadownloader')
 
@@ -35,6 +36,9 @@ def _parse_arguments(desc, args):
     parser.add_argument('--skipifexists', action='store_true',
                         help='Skip download if directory for id exists '
                              'on filesystem')
+    parser.add_argument('--skiprawfalse', action='store_true',
+                        help='Skip image entries for .raw files if the database'
+                             'says no raw file is available to download')
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
     return parser.parse_args(args)
@@ -60,6 +64,12 @@ def _download_cil_data_files(theargs):
         fac = CILDataFileFromDatabaseFactory(conn, id=theargs.id)
         cildatafiles = fac.get_cildatafiles()
         logger.info('Found ' + str(len(cildatafiles)) + ' entries')
+
+        if theargs.skiprawfalse is True:
+            noraw_filt = CILDataFileNoRawFilter()
+            cildatafiles = noraw_filt.get_cildatafiles(cildatafiles)
+            logger.info('Skipped raw without download count: ' +
+                    str(len(cildatafiles)))
 
         if theargs.skipifexists:
             logger.info("--skipifexists set to true. Skipping download if"
