@@ -11,6 +11,8 @@ import time
 
 logger = logging.getLogger(__name__)
 
+IMAGES_DIR = 'images'
+VIDEOS_DIR = 'videos'
 JSON_SUFFIX = '.json'
 BK_TXT = '.bk.'
 RAW_SUFFIX = '.raw'
@@ -482,6 +484,32 @@ class CILDataFileNoRawFilter(object):
                     if cdf.get_has_raw() is False:
                         logger.debug('Skipping entry: ' + cdf.get_file_name())
                         continue
+            filtered_cdf_list.append(cdf)
+        return filtered_cdf_list
+
+
+class CILDataFileFailedDownloadFilter(object):
+    """Filter that retreives CILDataFile objects that
+       failed to download, excluding .raw image
+       entries that failed to download with get_has_raw()
+       set to False
+    """
+    def __init__(self):
+        """Constructor"""
+
+    def get_cildatafiles(self, cildatafile_list):
+        """Removes CILDataFile objects that
+        had a successful download or if they were
+        .raw image entries that failed to download
+         with get_has_raw() set to False
+        """
+        if cildatafile_list is None:
+            logger.error('Received None so returning None')
+            return None
+        filtered_cdf_list = []
+        for cdf in cildatafile_list:
+            if cdf.get_download_success() is True:
+                continue
             filtered_cdf_list.append(cdf)
         return filtered_cdf_list
 
