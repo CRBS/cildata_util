@@ -16,6 +16,7 @@ from cildata_util.dbutil import CILDataFileJsonPickleWriter
 from cildata_util.dbutil import CILDataFileListFromJsonPickleFactory
 from cildata_util.dbutil import CILDataFileFromDatabaseFactory
 from cildata_util.dbutil import CILDataFileFoundInFilesystemFilter
+from cildata_util.dbutil import CILDataFileNoRawFilter
 
 
 class FakeCILDataFile(object):
@@ -219,7 +220,6 @@ class TestDbutil(unittest.TestCase):
         self.assertEqual(cdf.get_headers(), None)
         self.assertEqual(cdf.get_file_size(), None)
 
-
     def test_cildatafilefoundinfilesystemfilter(self):
         temp_dir = tempfile.mkdtemp()
         try:
@@ -262,12 +262,38 @@ class TestDbutil(unittest.TestCase):
             os.makedirs(cdf2_dir, mode=0o755)
             res = filt.get_cildatafiles([cdf, cdf2, cdf3])
             self.assertEqual(res, [cdf2])
-
-
-
         finally:
             shutil.rmtree(temp_dir)
 
+    def test_cildatafilenorawfilter(self):
+        filt = CILDataFileNoRawFilter()
+        self.assertEqual(filt.get_cildatafiles(None), None)
+        self.assertEqual(filt.get_cildatafiles([]), [])
+
+        cdf = CILDataFile(123)
+
+        try:
+            filt.get_cildatafiles([cdf])
+        except AttributeError:
+            pass
+
+        cdf.set_file_name(str(cdf.get_id()) + dbutil.JPG_SUFFIX)
+        res = filt.get_cildatafiles([cdf])
+        self.assertEqual(res, [cdf])
+
+        cdf2 = CILDataFile(456)
+        cdf2.set_is_video(True)
+        cdf2.set_file_name(str(cdf.get_id()) + dbutil.RAW_SUFFIX)
+        cdf2.set_has_raw(False)
+        res = filt.get_cildatafiles([cdf, cdf2])
+        self.assertEqual(res, [cdf, cdf2])
+
+        cdf3 = CILDataFile(444)
+        cdf3.set_is_video(False)
+        cdf3.set_file_name(str(cdf.get_id()) + dbutil.RAW_SUFFIX)
+        cdf3.set_has_raw(False)
+        res = filt.get_cildatafiles([cdf, cdf2, cdf3])
+        self.assertEqual(res, [cdf, cdf2])
 
     def test_cildatafilepicklewriter_writeonecdf(self):
         cdf = CILDataFile(123)
