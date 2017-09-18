@@ -62,6 +62,7 @@ def _fix_json_file(theargs):
                                           skipsuffixappend=True)
     return 0
 
+
 def main(args):
     """Main entry into fixjsonfile
     :param args: should be set to sys.argv aka the list of arguments
@@ -85,7 +86,7 @@ def main(args):
 
     try:
         return _fix_json_file(theargs)
-    except Exception as e:
+    except Exception:
         logger.exception('Caught fatal exception')
         return 1
 
