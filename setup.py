@@ -57,7 +57,6 @@ setup(
         'Programming Language :: Python :: 3.5',
     ],
     scripts=['cildata_util/cildatadownloader.py',
-             'cildata_util/fixjsonfile.py',
              'cildata_util/cildatacheckdownload.py',
              'cildata_util/cildatareport.py',
              'cildata_util/cilupdatehasrawinjson.py'],
