@@ -13,7 +13,6 @@ from cildata_util.dbutil import Database
 from cildata_util.dbutil import CILDataFileFromDatabaseFactory
 from cildata_util.dbutil import CILDataFileJsonPickleWriter
 from cildata_util.dbutil import CILDataFileFromJsonFilesFactory
-from cildata_util.dbutil import CILDataFileListFromJsonPickleFactory
 
 
 logger = logging.getLogger('cildata_util.cilupdatehasrawinjson')
