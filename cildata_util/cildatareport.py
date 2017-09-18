@@ -59,11 +59,6 @@ def _generate_report(theargs):
         unique_ids[cdf.get_id()] = 1
         counter += 1
         if cdf.get_download_success() is False:
-            # if cdf.get_file_name().endswith('.raw'):
-            #    if cdf.get_has_raw() is False:
-            #        logger.debug(cdf.get_file_name() + ' no raw, but is raw file')
-            #        not_supposed_to_have_raw += 1
-            #        continue
             failed_id_hash[cdf.get_id()] = True
             sys.stdout.write(cdf.get_file_name() + '\n')
             failed_count += 1
@@ -73,7 +68,8 @@ def _generate_report(theargs):
                 logger.debug(cdf.get_file_name() + 'mime type is None')
             else:
                 if cdf.get_mime_type().startswith('text'):
-                    logger.debug('Success, but type is text: ' + cdf.get_file_name())
+                    logger.debug('Success, but type is text: ' +
+                                 cdf.get_file_name())
 
         if cdf.get_mime_type() not in mimetypes:
             mimetypes[cdf.get_mime_type()] = 1
@@ -83,15 +79,19 @@ def _generate_report(theargs):
     num_unique_ids = len(unique_ids.keys())
     num_failed_ids = len(failed_id_hash.keys())
     sys.stdout.write('\n')
-    sys.stdout.write('Number entries: ' + str(counter) + ' (failed: ' + str(failed_count) + ')\n')
-    sys.stdout.write('Number unique IDs: ' + str(num_unique_ids) + ' (failed: ' + str(num_failed_ids) + ')\n')
+    sys.stdout.write('Number entries: ' + str(counter) +
+                     ' (failed: ' + str(failed_count) + ')\n')
+    sys.stdout.write('Number unique IDs: ' + str(num_unique_ids) +
+                     ' (failed: ' + str(num_failed_ids) + ')\n')
 
     if theargs.skiprawfalse is True:
-        sys.stdout.write('Number entries that are NOT supposed to have raw file: ' +
+        sys.stdout.write('Number entries that are NOT supposed to have '
+                         'raw file: ' +
                          str(not_supposed_to_have_raw) + '\n')
     sys.stdout.write('-----------------\n')
     for entry in mimetypes.keys():
-        sys.stdout.write('\t' + str(entry) + ' ==> ' + str(mimetypes[entry]) + '\n')
+        sys.stdout.write('\t' + str(entry) + ' ==> ' +
+                         str(mimetypes[entry]) + '\n')
     return 0
 
 
@@ -117,7 +117,7 @@ def main(args):
 
     try:
         return _generate_report(theargs)
-    except Exception as e:
+    except Exception:
         logger.exception('Caught fatal exception')
         return 1
 
