@@ -14,12 +14,11 @@ from cildata_util.dbutil import CILDataFile
 from cildata_util.dbutil import CILDataFileJsonPickleWriter
 from cildata_util.dbutil import CILDataFileListFromJsonPickleFactory
 
+
 class FakeCILDataFile(object):
     """Fake object
     """
     pass
-
-
 
 
 class TestDbutil(unittest.TestCase):
@@ -45,7 +44,7 @@ class TestDbutil(unittest.TestCase):
     def test_make_backup_of_json(self):
         temp_dir = tempfile.mkdtemp()
         try:
-            somefile = os.path.join(temp_dir,'somefile.json')
+            somefile = os.path.join(temp_dir, 'somefile.json')
             with open(somefile, 'w') as f:
                 f.write('hi\n')
                 f.flush()
@@ -106,7 +105,7 @@ class TestDbutil(unittest.TestCase):
             shutil.rmtree(temp_dir)
 
     def test_download_file_num_retries_negative(self):
-        self.assertEqual(dbutil.download_file('foo','/tmp', numretries=-1),
+        self.assertEqual(dbutil.download_file('foo', '/tmp', numretries=-1),
                          (None, None, 999))
 
     def test_database_get_alternate_connection(self):
@@ -235,20 +234,3 @@ class TestDbutil(unittest.TestCase):
                              cdf_list[1].get_file_name())
         finally:
             shutil.rmtree(temp_dir)
-
-"""
-    def test_read_old_json_and_write_and_read(self):
-        reader = CILDataFileListFromJsonPickleFactory()
-        # cdf_list = reader.get_cildatafiles('/home/churas/src/CIL_file_download_tool/39602.json')
-        cdf_list = reader.get_cildatafiles('/home/churas/tasks/cil_downloader/out/images/10001/10001.json')
-        self.assertEqual(cdf_list[0].get_file_size(), None)
-        self.assertEqual(str(cdf_list[0].get_headers()), "{u'Content-disposition': u'attachment; filename=10001.tif', u'Transfer-Encoding': u'chunked', u'Server': u'Jetty(6.1.18)', u'Connection': u'close', u'Date': u'Mon, 21 Aug 2017 22:20:40 GMT', u'Content-Type': u'image/tif'}")
-
-        writer = CILDataFileJsonPickleWriter()
-        writer.writeCILDataFileListToFile('/home/churas/yo', cdf_list)
-
-        newcdf_list = reader.get_cildatafiles('/home/churas/yo.json')
-        self.assertEqual(newcdf_list[0].get_file_size(), None)
-        self.assertEqual(str(newcdf_list[0].get_headers()), "{u'Content-disposition': u'attachment; filename=10001.tif', u'Transfer-Encoding': u'chunked', u'Server': u'Jetty(6.1.18)', u'Connection': u'close', u'Date': u'Mon, 21 Aug 2017 22:20:40 GMT', u'Content-Type': u'image/tif'}")
-"""
-
