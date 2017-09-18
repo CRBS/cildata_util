@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 JSON_SUFFIX = '.json'
 BK_TXT = '.bk.'
 RAW_SUFFIX = '.raw'
+JPG_SUFFIX = '.jpg'
+TIF_SUFFIX = '.tif'
+FLV_SUFFIX = '.flv'
 
 
 def make_backup_of_json(jsonfile):
@@ -32,7 +35,7 @@ def make_backup_of_json(jsonfile):
 
 
 def download_file(url, dest_dir, numretries=2,
-                   retry_sleep=30, timeout=120,
+                  retry_sleep=30, timeout=120,
                   session=None):
     """Downloads file from `url` to `dest_dir` path
     :param url: URL to download ie http://foo.com/file
@@ -72,17 +75,35 @@ def download_file(url, dest_dir, numretries=2,
 
 def get_download_url(base_url, omero_url, cdf):
 
-    if cdf.get_file_name().endswith('.flv'):
+    if cdf is None:
+        logger.error('cdf is None cannot get download url')
+        return None
+
+    if base_url is None:
+        logger.error('base_url is None cannot get download url')
+        return None
+
+    if omero_url is None:
+        logger.error('omero_url is None cannot get download url')
+        return None
+
+    if cdf.get_file_name() is None:
+        logger.error('Unable to get cdf aka CILDataFile filename'
+                     'cannot figure out what to download')
+        return None
+
+    if cdf.get_file_name().endswith(FLV_SUFFIX):
         return base_url + 'videos/'
 
-    if cdf.get_file_name().endswith('.jpg'):
+    if cdf.get_file_name().endswith(JPG_SUFFIX):
         return base_url + 'images/download_jpeg/'
 
-    if cdf.get_file_name().endswith('.tif'):
+    if cdf.get_file_name().endswith(TIF_SUFFIX):
         return omero_url
 
-    if cdf.get_file_name().endswith('.raw'):
+    if cdf.get_file_name().endswith(RAW_SUFFIX):
         return omero_url
+
     logger.error('Not sure how to download this file: ' +
                  cdf.get_file_name())
     return None
@@ -132,10 +153,13 @@ def download_cil_data_file(destination_dir, cdf, loadbaseurl=False,
 
     base_url = 'http://www.cellimagelibrary.org/'
     omero_url = 'http://grackle.crbs.ucsd.edu:8080/OmeroWebService/images/'
-    str_id = str(cdf.get_id())
+
+    if cdf is None:
+        logger.error('cdf is None cannot download')
+        return None
 
     if download_direct_to_dest is False:
-        out_dir = os.path.join(destination_dir, str_id)
+        out_dir = os.path.join(destination_dir, str(cdf.get_id()))
     else:
         out_dir = destination_dir
 
@@ -144,17 +168,17 @@ def download_cil_data_file(destination_dir, cdf, loadbaseurl=False,
     if loadbaseurl is True:
         # hit download page
         logger.debug('Loading base url')
-        aurl = base_url + 'images/' + str_id
+        aurl = base_url + 'images/' + str(cdf.get_id())
         r = requests.get(aurl)
         if r.status_code is not 200:
             logger.warning('Hitting ' + aurl + ' returned status of ' +
                            str(r.status_code))
 
-    logger.info('Downloading file: ' + cdf.get_file_name())
     download_url = get_download_url(base_url, omero_url, cdf)
     if download_url is None:
-        return
+        return None
 
+    logger.info('Downloading file: ' + cdf.get_file_name())
     (local_file, headers,
      status) = download_file(download_url +
                              cdf.get_file_name(),
@@ -392,16 +416,29 @@ class CILDataFileFoundInFilesystemFilter(object):
         COnstructor
         :param images_dir: Directory where images are stored
         :param videos_dir: Directory where videos are stored
+        :raises ValueError: If either images_dir or videos_dir is None
         """
         self._images_dir = images_dir
         self._videos_dir = videos_dir
+        if self._images_dir is None:
+            raise ValueError('images_dir cannot be None')
+        if self._videos_dir is None:
+            raise ValueError('videos_dir cannot be None')
 
     def get_cildatafiles(self, cildatafile_list):
         """Filters out any CILDataFile objects
            that have a presence on filesystem
            where presence means a directory
            exists
+        :returns: list of CILDataFile objects that passed filter or
+                  None if None was passed in. An empty list will return
+                  an empty list.
         """
+
+        if cildatafile_list is None:
+            logger.debug('Received None so returning None')
+            return None
+
         filtered_cdf_list = []
         for cdf in cildatafile_list:
             if cdf.get_is_video():
@@ -477,16 +514,18 @@ class CILDataFileFromJsonFilesFactory(object):
 class CILDataFileFromDatabaseFactory(object):
     """Obtains CILDataFile objects from database
     """
-    IMG_SUFFIX_LIST = ['.tif', '.jpg', '.raw']
-    VID_SUFFIX_LIST = ['.flv', '.raw', '.jpg']
+    IMG_SUFFIX_LIST = [TIF_SUFFIX, JPG_SUFFIX, RAW_SUFFIX]
+    VID_SUFFIX_LIST = [FLV_SUFFIX, RAW_SUFFIX, JPG_SUFFIX]
 
-    def __init__(self, conn, id=None):
+    def __init__(self, conn, id=None, skipifrawfalse=False):
         """Constructor
         :param conn: database connection already connected
         :param id: only return CILDataFile objects with matching id.
+        :param skipifrawfalse: Omit the .raw image if has_raw is False
         """
         self._conn = conn
         self._id = id
+        self._skipifrawfalse = skipifrawfalse
 
     def get_cildatafiles(self):
         """Queries database to get CILDataFile objects
@@ -495,8 +534,18 @@ class CILDataFileFromDatabaseFactory(object):
            method also updates status information from status table
         """
         origcdflist = self._get_cildatafiles_from_data_type_table()
+        return self._generate_cildatafiles_from_database(origcdflist)
+
+    def _generate_cildatafiles_from_database(self, cdflist):
+        """Given a list of CILDataFile objects from the database,
+        which is one CILDataFile per id, generates all the CILDataFile
+        objects which should include multiple CILDataFile objects
+        per id.
+        :param cdflist:
+        :return:
+        """
         newcdflist = []
-        for cdf in origcdflist:
+        for cdf in cdflist:
             if cdf.get_is_video():
                 counter = 0
                 cur_id = cdf.get_id()
@@ -515,6 +564,10 @@ class CILDataFileFromDatabaseFactory(object):
                 counter = 0
                 cur_id = cdf.get_id()
                 for suffix in CILDataFileFromDatabaseFactory.IMG_SUFFIX_LIST:
+                    if self._skipifrawfalse is True and suffix == RAW_SUFFIX:
+                        if cdf.get_has_raw() is False:
+                            continue
+
                     if counter is 0:
                         newcdf = cdf
                         counter = 1
@@ -523,7 +576,6 @@ class CILDataFileFromDatabaseFactory(object):
                     newcdf.copy(cdf)
                     newcdf.set_file_name(str(cur_id) + suffix)
                     newcdflist.append(newcdf)
-
         return newcdflist
 
     def _update_CILDataFileWithStatusFromDatabase(self, cdf):

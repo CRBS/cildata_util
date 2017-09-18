@@ -7,12 +7,15 @@ import os
 import tempfile
 import shutil
 import unittest
+from mock import Mock
 
 from cildata_util import dbutil
 from cildata_util.dbutil import Database
 from cildata_util.dbutil import CILDataFile
 from cildata_util.dbutil import CILDataFileJsonPickleWriter
 from cildata_util.dbutil import CILDataFileListFromJsonPickleFactory
+from cildata_util.dbutil import CILDataFileFromDatabaseFactory
+from cildata_util.dbutil import CILDataFileFoundInFilesystemFilter
 
 
 class FakeCILDataFile(object):
@@ -82,6 +85,30 @@ class TestDbutil(unittest.TestCase):
         finally:
             shutil.rmtree(temp_dir)
 
+    def test_get_download_url(self):
+        self.assertEqual(dbutil.get_download_url(None, None, None), None)
+        self.assertEqual(dbutil.get_download_url(None, None, 'foo'), None)
+        self.assertEqual(dbutil.get_download_url('foo', None, 'foo'), None)
+
+        cdf = CILDataFile(123)
+        self.assertEqual(dbutil.get_download_url('foo','bar', cdf), None)
+
+        cdf.set_file_name(str(cdf.get_id) + dbutil.FLV_SUFFIX)
+        self.assertEqual(dbutil.get_download_url('b/', 'om/', cdf),
+                         'b/videos/')
+        cdf.set_file_name(str(cdf.get_id) + dbutil.JPG_SUFFIX)
+        self.assertEqual(dbutil.get_download_url('b/', 'om/', cdf),
+                         'b/images/download_jpeg/')
+        cdf.set_file_name(str(cdf.get_id) + dbutil.TIF_SUFFIX)
+        self.assertEqual(dbutil.get_download_url('b/', 'om/', cdf),
+                         'om/')
+        cdf.set_file_name(str(cdf.get_id) + dbutil.RAW_SUFFIX)
+        self.assertEqual(dbutil.get_download_url('b/', 'om/', cdf),
+                         'om/')
+
+        cdf.set_file_name(str(cdf.get_id) + '.foo')
+        self.assertEqual(dbutil.get_download_url('b/', 'om/', cdf), None)
+
     def test_md5(self):
         temp_dir = tempfile.mkdtemp()
         try:
@@ -107,6 +134,26 @@ class TestDbutil(unittest.TestCase):
     def test_download_file_num_retries_negative(self):
         self.assertEqual(dbutil.download_file('foo', '/tmp', numretries=-1),
                          (None, None, 999))
+
+    def test_convert_response_headers_to_dict(self):
+        self.assertEqual(dbutil.convert_response_headers_to_dict(None), None)
+        foo = dict()
+        foo['hi'] = 'bye'
+        foo['2'] = '3'
+        res = dbutil.convert_response_headers_to_dict(foo)
+        self.assertEqual(res['hi'], 'bye')
+        self.assertEqual(res['2'], '3')
+
+    def test_download_cil_data_file_with_error_cases(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            res = dbutil.download_cil_data_file('/foo', None)
+            self.assertEqual(res, None)
+            cdf = CILDataFile(123)
+            res = dbutil.download_cil_data_file(temp_dir, cdf)
+            self.assertEqual(res, None)
+        finally:
+            shutil.rmtree(temp_dir)
 
     def test_database_get_alternate_connection(self):
         db = Database(None)
@@ -172,6 +219,56 @@ class TestDbutil(unittest.TestCase):
         self.assertEqual(cdf.get_headers(), None)
         self.assertEqual(cdf.get_file_size(), None)
 
+
+    def test_cildatafilefoundinfilesystemfilter(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            try:
+                CILDataFileFoundInFilesystemFilter(None, None)
+            except ValueError as e:
+                self.assertEqual(str(e), 'images_dir cannot be None')
+
+            try:
+                CILDataFileFoundInFilesystemFilter('foo', None)
+            except ValueError as e:
+                self.assertEqual(str(e), 'videos_dir cannot be None')
+
+            imgs_dir = os.path.join(temp_dir, 'images')
+            vids_dir = os.path.join(temp_dir, 'videos')
+            filt = CILDataFileFoundInFilesystemFilter(imgs_dir, vids_dir)
+
+            self.assertEqual(filt.get_cildatafiles(None), None)
+            cdf = CILDataFile(123)
+            cdf.set_is_video(False)
+
+            res = filt.get_cildatafiles([cdf])
+            self.assertEqual(res, [cdf])
+            cdf_dir = os.path.join(imgs_dir, str(cdf.get_id()))
+            os.makedirs(cdf_dir, mode=0o755)
+
+            cdf2 = CILDataFile(456)
+            cdf2.set_is_video(False)
+
+            res = filt.get_cildatafiles([cdf, cdf2])
+            self.assertEqual(res, [cdf2])
+
+            cdf3 = CILDataFile(123)
+            cdf3.set_is_video(True)
+
+            res = filt.get_cildatafiles([cdf, cdf2, cdf3])
+            self.assertEqual(res, [cdf2, cdf3])
+
+            cdf2_dir = os.path.join(vids_dir, str(cdf3.get_id()))
+            os.makedirs(cdf2_dir, mode=0o755)
+            res = filt.get_cildatafiles([cdf, cdf2, cdf3])
+            self.assertEqual(res, [cdf2])
+
+
+
+        finally:
+            shutil.rmtree(temp_dir)
+
+
     def test_cildatafilepicklewriter_writeonecdf(self):
         cdf = CILDataFile(123)
         cdf.set_checksum('123')
@@ -234,3 +331,78 @@ class TestDbutil(unittest.TestCase):
                              cdf_list[1].get_file_name())
         finally:
             shutil.rmtree(temp_dir)
+
+    def test_generate_cildatafiles_from_database_empty_list(self):
+        fac = CILDataFileFromDatabaseFactory('hi')
+        res = fac._generate_cildatafiles_from_database([])
+        self.assertEqual(res, [])
+
+    def test_generate_cildatafiles_from_database_one_image_default(self):
+        fac = CILDataFileFromDatabaseFactory('hi')
+        cdf = CILDataFile(123)
+        cdf.set_is_video(False)
+        cdf.set_has_raw(False)
+        res = fac._generate_cildatafiles_from_database([cdf])
+        self.assertEqual(len(res), 3)
+        self.assertEqual(res[0].get_file_name(), '123' +
+                         dbutil.TIF_SUFFIX)
+        self.assertEqual(res[0].get_is_video(), False)
+        self.assertEqual(res[1].get_file_name(), '123' +
+                         dbutil.JPG_SUFFIX)
+        self.assertEqual(res[1].get_is_video(), False)
+
+        self.assertEqual(res[2].get_file_name(), '123' +
+                         dbutil.RAW_SUFFIX)
+        self.assertEqual(res[2].get_is_video(), False)
+
+    def test_generate_cildatafiles_from_database_one_image_skipraw(self):
+        fac = CILDataFileFromDatabaseFactory('hi', skipifrawfalse=True)
+        cdf = CILDataFile(123)
+        cdf.set_is_video(False)
+        cdf.set_has_raw(False)
+        res = fac._generate_cildatafiles_from_database([cdf])
+        self.assertEqual(len(res), 2)
+
+        self.assertEqual(res[0].get_file_name(), '123' +
+                         dbutil.TIF_SUFFIX)
+        self.assertEqual(res[0].get_is_video(), False)
+        self.assertEqual(res[1].get_file_name(), '123' +
+                         dbutil.JPG_SUFFIX)
+        self.assertEqual(res[1].get_is_video(), False)
+
+    def test_generate_cildatafiles_from_database_one_image_withraw(self):
+        fac = CILDataFileFromDatabaseFactory('hi',skipifrawfalse=True)
+        cdf = CILDataFile(123)
+        cdf.set_is_video(False)
+        cdf.set_has_raw(True)
+        res = fac._generate_cildatafiles_from_database([cdf])
+        self.assertEqual(len(res), 3)
+        self.assertEqual(res[0].get_file_name(), '123' +
+                         dbutil.TIF_SUFFIX)
+        self.assertEqual(res[0].get_is_video(), False)
+        self.assertEqual(res[1].get_file_name(), '123' +
+                         dbutil.JPG_SUFFIX)
+        self.assertEqual(res[1].get_is_video(), False)
+
+        self.assertEqual(res[2].get_file_name(), '123' +
+                         dbutil.RAW_SUFFIX)
+        self.assertEqual(res[2].get_is_video(), False)
+
+
+    def test_generate_cildatafiles_from_database_one_video_default(self):
+        fac = CILDataFileFromDatabaseFactory('hi')
+        cdf = CILDataFile(123)
+        cdf.set_is_video(True)
+        cdf.set_has_raw(False)
+        res = fac._generate_cildatafiles_from_database([cdf])
+        self.assertEqual(len(res), 3)
+        self.assertEqual(res[0].get_file_name(), '123' +
+                         dbutil.FLV_SUFFIX)
+        self.assertEqual(res[0].get_is_video(), True)
+        self.assertEqual(res[1].get_file_name(), '123' +
+                         dbutil.RAW_SUFFIX)
+        self.assertEqual(res[1].get_is_video(), True)
+
+        self.assertEqual(res[2].get_file_name(), '123' +
+                         dbutil.JPG_SUFFIX)
+        self.assertEqual(res[2].get_is_video(), True)
