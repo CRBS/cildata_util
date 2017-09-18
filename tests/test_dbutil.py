@@ -332,9 +332,8 @@ class TestDbutil(unittest.TestCase):
             writer.writeCILDataFileListToFile(twojson, [cdf],
                                               skipsuffixappend=True)
 
-
-
-
+            res = fac.get_cildatafiles(temp_dir)
+            self.assertEqual(len(res), 2)
         finally:
             shutil.rmtree(temp_dir)
 
