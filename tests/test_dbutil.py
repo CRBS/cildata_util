@@ -17,6 +17,7 @@ from cildata_util.dbutil import CILDataFileListFromJsonPickleFactory
 from cildata_util.dbutil import CILDataFileFromDatabaseFactory
 from cildata_util.dbutil import CILDataFileFoundInFilesystemFilter
 from cildata_util.dbutil import CILDataFileNoRawFilter
+from cildata_util.dbutil import CILDataFileFromJsonFilesFactory
 
 
 class FakeCILDataFile(object):
@@ -294,6 +295,49 @@ class TestDbutil(unittest.TestCase):
         cdf3.set_has_raw(False)
         res = filt.get_cildatafiles([cdf, cdf2, cdf3])
         self.assertEqual(res, [cdf, cdf2])
+
+    def test_cildatafilefromjsonfilesfactory(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            fac = CILDataFileFromJsonFilesFactory()
+            self.assertEqual(fac.get_cildatafiles(None), None)
+            self.assertEqual(fac.get_cildatafiles(temp_dir), [])
+
+            cdf = CILDataFile(123)
+            onejson = os.path.join(temp_dir, str(cdf.get_id()) +
+                                   dbutil.JSON_SUFFIX)
+            writer = CILDataFileJsonPickleWriter()
+            writer.writeCILDataFileListToFile(onejson, [cdf],
+                                              skipsuffixappend=True)
+
+            res = fac.get_cildatafiles(onejson)
+            self.assertEqual(len(res), 1)
+            self.assertEqual(res[0].get_id(), 123)
+
+            res = fac.get_cildatafiles(temp_dir)
+            self.assertEqual(len(res), 1)
+            self.assertEqual(res[0].get_id(), 123)
+
+            notjson = os.path.join(temp_dir, '234.json.bk')
+            open(notjson, 'a').close()
+            res = fac.get_cildatafiles(temp_dir)
+            self.assertEqual(len(res), 1)
+            self.assertEqual(res[0].get_id(), 123)
+
+            cdf = CILDataFile(456)
+            subdir = os.path.join(temp_dir, '456')
+            os.makedirs(subdir, mode=0o755)
+            twojson = os.path.join(subdir, str(cdf.get_id()) +
+                                   dbutil.JSON_SUFFIX)
+            writer.writeCILDataFileListToFile(twojson, [cdf],
+                                              skipsuffixappend=True)
+
+
+
+
+        finally:
+            shutil.rmtree(temp_dir)
+
 
     def test_cildatafilepicklewriter_writeonecdf(self):
         cdf = CILDataFile(123)

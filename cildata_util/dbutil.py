@@ -509,6 +509,10 @@ class CILDataFileFromJsonFilesFactory(object):
 
     def get_cildatafiles(self, dir_path):
 
+        if dir_path is None:
+            logger.error('None passed in')
+            return None
+
         reader = CILDataFileListFromJsonPickleFactory()
         full_list = []
         for jsonfile in self._get_all_json_files(dir_path):
