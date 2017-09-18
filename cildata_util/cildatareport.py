@@ -28,6 +28,9 @@ def _parse_arguments(desc, args):
     parser.add_argument("--skiprawfalse", action='store_true',
                         help='If set dont count .raw file entries '
                              'where has raw is false')
+    parser.add_argument("--printfailed", action='store_true',
+                        help='If set output file names of files that'
+                             'failed to download')
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
     return parser.parse_args(args)
@@ -55,12 +58,15 @@ def _generate_report(theargs):
     else:
         filt_cdf_list = cdf_list
 
+    if theargs.printfailed is True:
+        sys.stdout.write('Failed\n')
     for cdf in filt_cdf_list:
         unique_ids[cdf.get_id()] = 1
         counter += 1
         if cdf.get_download_success() is False:
             failed_id_hash[cdf.get_id()] = True
-            sys.stdout.write(cdf.get_file_name() + '\n')
+            if theargs.printfailed is True:
+                sys.stdout.write(cdf.get_file_name() + '\n')
             failed_count += 1
             failed_list.append(cdf)
         else:
@@ -75,6 +81,9 @@ def _generate_report(theargs):
             mimetypes[cdf.get_mime_type()] = 1
         else:
             mimetypes[cdf.get_mime_type()] += 1
+
+    if theargs.printfailed is True:
+        sys.stdout.write('-----------\n')
 
     num_unique_ids = len(unique_ids.keys())
     num_failed_ids = len(failed_id_hash.keys())
