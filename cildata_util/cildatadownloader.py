@@ -14,6 +14,8 @@ from cildata_util.dbutil import CILDataFileFromDatabaseFactory
 from cildata_util.dbutil import CILDataFileJsonPickleWriter
 from cildata_util.dbutil import CILDataFileFoundInFilesystemFilter
 from cildata_util.dbutil import CILDataFileNoRawFilter
+from cildata_util.dbutil import CILDataFileFromJsonFilesFactory
+from cildata_util.dbutil import CILDataFileFailedDownloadFilter
 
 logger = logging.getLogger('cildata_util.cildatadownloader')
 
@@ -40,9 +42,36 @@ def _parse_arguments(desc, args):
                         help='Skip image entries for .raw files if the '
                              'database says no raw file is available to '
                              'download')
+    parser.add_argument('--retryfailed', action='store_true',
+                        help='Going off of filesystem retry any failed'
+                             'downloads')
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
     return parser.parse_args(args)
+
+
+def _retry_download_of_failed(theargs):
+    """Examine all downloaded data and retry any
+       failed entries
+    """
+    abs_destdir = os.path.abspath(theargs.destdir)
+    images_destdir = os.path.join(abs_destdir, dbutil.IMAGES_DIR)
+    videos_destdir = os.path.join(abs_destdir, dbutil.VIDEOS_DIR)
+    fac = CILDataFileFromJsonFilesFactory()
+    all_cdf = fac.get_cildatafiles(abs_destdir)
+
+    logger.info('Total entries: ' + str(len(all_cdf)))
+
+    filter = CILDataFileFailedDownloadFilter()
+    failfilt_cdf = filter.get_cildatafiles(all_cdf)
+    no_rawfilt = CILDataFileNoRawFilter()
+    filt_cdf = no_rawfilt.get_cildatafiles(failfilt_cdf)
+    logger.info('Failed entries: ' + str(len(filt_cdf)))
+
+
+    for cdf in filt_cdf:
+        sys.stdout.write(cdf.get_file_name() + '\n')
+    return 0
 
 
 def _download_cil_data_files(theargs):
@@ -52,8 +81,8 @@ def _download_cil_data_files(theargs):
     db = Database(dbconf)
     logger.debug('Getting database connection')
     abs_destdir = os.path.abspath(theargs.destdir)
-    images_destdir = os.path.join(abs_destdir, 'images')
-    videos_destdir = os.path.join(abs_destdir, 'videos')
+    images_destdir = os.path.join(abs_destdir, dbutil.IMAGES_DIR)
+    videos_destdir = os.path.join(abs_destdir, dbutil.VIDEOS_DIR)
     conn = None
     last_id = -1
     last_outdir = None
@@ -136,6 +165,9 @@ def main(args):
     config.setup_logging(logger, loglevel=theargs.loglevel)
 
     try:
+        if theargs.retryfailed is True:
+            return _retry_download_of_failed(theargs)
+
         return _download_cil_data_files(theargs)
     except Exception:
         logger.exception('Caught fatal exception')
