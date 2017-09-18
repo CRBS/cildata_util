@@ -37,8 +37,9 @@ def _parse_arguments(desc, args):
                         help='Skip download if directory for id exists '
                              'on filesystem')
     parser.add_argument('--skiprawfalse', action='store_true',
-                        help='Skip image entries for .raw files if the database'
-                             'says no raw file is available to download')
+                        help='Skip image entries for .raw files if the '
+                             'database says no raw file is available to '
+                             'download')
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
     return parser.parse_args(args)
@@ -69,7 +70,7 @@ def _download_cil_data_files(theargs):
             noraw_filt = CILDataFileNoRawFilter()
             cildatafiles = noraw_filt.get_cildatafiles(cildatafiles)
             logger.info('Skipped raw without download count: ' +
-                    str(len(cildatafiles)))
+                        str(len(cildatafiles)))
 
         if theargs.skipifexists:
             logger.info("--skipifexists set to true. Skipping download if"
@@ -136,7 +137,7 @@ def main(args):
 
     try:
         return _download_cil_data_files(theargs)
-    except Exception as e:
+    except Exception:
         logger.exception('Caught fatal exception')
         return 1
 
