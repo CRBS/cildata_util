@@ -467,7 +467,14 @@ class CILDataFileNoRawFilter(object):
     def get_cildatafiles(self, cildatafile_list):
         """Filters out any CILDataFile objects as described
            in constructor.
+        :raises AttributeError: if CILDataFile does not have values for
+                                get_file_name()
+        :returns: filtered list of CILDataFile objects
         """
+        if cildatafile_list is None:
+            logger.debug('Received None so returning None')
+            return None
+
         filtered_cdf_list = []
         for cdf in cildatafile_list:
             if cdf.get_is_video() is not True:
@@ -486,7 +493,6 @@ class CILDataFileFromJsonFilesFactory(object):
     def __init__(self):
         """Constructor
         """
-        pass
 
     def _get_all_json_files(self, path):
         """Generator
