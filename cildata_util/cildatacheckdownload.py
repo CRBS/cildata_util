@@ -5,7 +5,6 @@ import argparse
 import sys
 import logging
 import os
-import shutil
 import re
 import cildata_util
 from cildata_util import dbutil
@@ -100,9 +99,11 @@ def _checkdownload(theargs):
     updated = False
     for cdf in cdf_list:
         if not os.path.isfile(os.path.join(destpath, cdf.get_file_name())):
-            logger.info(cdf.get_file_name() + ' file not found. Downloading...')
+            logger.info(cdf.get_file_name() + ' file not found. '
+                                              'Downloading...')
             if theargs.dryrun is True:
-                sys.stdout.write('DRY RUN: Download' + cdf.get_file_name() +'\n')
+                sys.stdout.write('DRY RUN: Download' + cdf.get_file_name() +
+                                 '\n')
             else:
                 newcdf = dbutil.download_cil_data_file(destpath, cdf,
                                                        loadbaseurl=not updated,
@@ -114,7 +115,8 @@ def _checkdownload(theargs):
             newcdf_list.append(cdf)
 
     if updated is True and theargs.dryrun is False:
-        logger.info('Making backup of json and writing updated version of json')
+        logger.info('Making backup of json and writing updated version of '
+                    'json')
         dbutil.make_backup_of_json(jsonfile)
         writer = CILDataFileJsonPickleWriter()
         writer.writeCILDataFileListToFile(jsonfile,
@@ -148,7 +150,7 @@ def main(args):
 
     try:
         return _checkdownload(theargs)
-    except Exception as e:
+    except Exception:
         logger.exception('Caught fatal exception')
         return 1
 
