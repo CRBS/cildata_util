@@ -110,14 +110,11 @@ def _update_cil_data_files(theargs):
 
 def _write_updated_cil_data_files(theargs, cildatafile_hash):
     """Does the download"""
-    download_dir = os.path.abspath(theargs.downloaddir)
     factory = CILDataFileFromJsonFilesFactory()
     abs_destdir = os.path.abspath(theargs.downloaddir)
     images_destdir = os.path.join(abs_destdir, 'images')
-    reader = CILDataFileListFromJsonPickleFactory()
     writer = CILDataFileJsonPickleWriter()
 
-    no_raw_counter = 0
     for entry in os.listdir(images_destdir):
         fp = os.path.join(images_destdir, entry)
         if not os.path.isdir(fp):
@@ -158,7 +155,7 @@ def main(args):
 
     try:
         return _update_cil_data_files(theargs)
-    except Exception as e:
+    except Exception:
         logger.exception('Caught fatal exception')
         return 1
 
