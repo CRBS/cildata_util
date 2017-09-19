@@ -1,3 +1,4 @@
+import re
 import os
 import logging
 import pg8000
@@ -7,6 +8,8 @@ import hashlib
 import shutil
 import requests
 import time
+import mimetypes
+import zipfile
 
 
 logger = logging.getLogger(__name__)
@@ -19,6 +22,11 @@ RAW_SUFFIX = '.raw'
 JPG_SUFFIX = '.jpg'
 TIF_SUFFIX = '.tif'
 FLV_SUFFIX = '.flv'
+ZIP_SUFFIX = '.zip'
+
+ZIP_MIMETYPE = 'application/zip'
+ORIG_IDENTIFIER = '_orig'
+CONTENT_DISPOSITION = 'Content-disposition'
 
 
 def make_backup_of_json(jsonfile):
@@ -733,3 +741,214 @@ class CILDataFileListFromJsonPickleFactory(object):
 
             cdf_list.append(cdf)
         return cdf_list
+
+
+class CILDataFileConverter(object):
+    """Following guidelines set in
+    https://github.com/slash-segmentation/CIL_file_download_tool/wiki
+    Instances of this class perform renames and create new CILDataFile
+    objects and physical files.
+    """
+    def __init__(self):
+        """Constructor
+        """
+
+    def convert(self, cdf, cdf_dir):
+        """Converts CILDataFile object and corresponding file
+        to appropriate format. This method also creates
+        new CILDataFile objects if needed.
+
+        If CILDataFile is_video is True then the following occurs:
+
+          If extension on get_file_name() is anything other then
+          .raw then CILDataFile is returned unchanged.
+
+          If .raw then the type of file is determined and the
+          .raw extension is replaced with this new extension on
+          the physical file and in get_file_name(). In addition,
+          This new file is placed into a new .zip file and a
+          new CILDataFile object is created to represent this .zip
+          file.
+
+        If CILDataFile is image aka is_video not True
+        (can be None or False) then the following occurs:
+
+          If extension on get_file_name() is .raw, verify its a zip
+          file and rename to .zip. Update the CILDataFile with
+           this new extension. Then extract contents of this
+          .zip file and whatever file found in there should be renamed
+          <ID>_orig.<FORMAT> where <FORMAT> is extension already on
+          file. A new CILDataFile object should be created for this
+          new file and a new md5 run.
+
+        :returns: list of CILDataFile objects
+        """
+        if cdf is None:
+            logger.error('None received so None returned')
+            return None
+
+        if not cdf.get_download_success() is True:
+            logger.error(str(cdf.get_file_name()) +
+                         ' did not have a successful download. Skipping...')
+            return cdf
+
+        if cdf.get_file_name() is None:
+            raise ValueError('For id ' + str(cdf.get_id()) +
+                             ' file name is NOT set')
+
+        if cdf.get_is_video() is not True:
+            return self._convert_image(cdf)
+
+        return self._convert_video(cdf)
+
+    def _convert_video(self, cdf, cdf_dir):
+        """Converts video
+        """
+        if not cdf.get_file_name().endswith(RAW_SUFFIX):
+            return cdf
+
+        # we have a file with .raw ending look at Content-disposition
+        # to get suffix and compare that with mimetype.
+        new_suffix = self._get_raw_video_extension(cdf)
+
+        # perform rename and update CILDataFile
+        cdf = self._change_suffix_on_cildatafile(cdf, new_suffix, cdf_dir)
+
+        # create zip with new file in it.
+        zipcdf = self._create_video_zip_file(cdf, cdf_dir)
+
+        return [cdf, zipcdf]
+
+    def _convert_image(self, cdf, cdf_dir):
+        """Converts image
+        """
+        if not cdf.get_file_name().endswith(RAW_SUFFIX):
+            return cdf
+        old_file = os.path.join(cdf_dir, cdf.get_file_name())
+
+        if not zipfile.is_zipfile(old_file):
+            raise ValueError(old_file + ' is NOT a zip file')
+
+        cdf = self._change_suffix_on_cildatafile(cdf, ZIP_SUFFIX,
+                                                 cdf_dir)
+
+        extracted_cdf = self._extract_image_from_zip(cdf, cdf_dir)
+        return [cdf, extracted_cdf]
+
+    def _extract_image_from_zip(self, cdf, cdf_dir):
+        """Extracts image from zip file specified by CILDataFile `cdf` and
+           renames is <ID>_orig.<suffix of file in zip>
+        """
+        zip_file = os.path.join(cdf_dir, cdf.get_file_name())
+        zf = zipfile.ZipFile(zip_file, mode='r', allowZip64=True)
+        zipinfo_entries = zf.infolist()
+        if len(zipinfo_entries) is not 1:
+            raise ValueError('Expected single file in ' + zip_file +
+                             ' but found: ' + str(len(zipinfo_entries)) +
+                             ' entries')
+        tmpdir = os.path.join(cdf_dir, 'tmp')
+        try:
+            os.makedirs(tmpdir, mode=0o755)
+
+            extracted_file = zf.extract(zipinfo_entries[0], path=tmpdir)
+            suffix = re.sub('^.*\.','', zipinfo_entries[0].filename)
+            suffix = '.' + suffix
+            new_file_name = str(cdf.get_id()) + ORIG_IDENTIFIER + suffix
+            new_file = os.path.join(cdf_dir, new_file_name)
+            os.rename(extracted_file, new_file)
+        finally:
+            shutil.rmtree(tmpdir)
+
+        newcdf = CILDataFile(cdf.get_id())
+        newcdf.copy(cdf)
+        newcdf.set_file_name(new_file_name)
+        newcdf.set_mime_type(mimetypes.guess_type(new_file_name)[0])
+        newcdf.set_file_size(os.path.getsize(new_file))
+        newcdf.set_checksum(md5(new_file))
+        return newcdf
+
+    def _create_video_zip_file(self, cdf, cdf_dir):
+        """Takes file specified in get_file_name() and puts it into
+        a zip file named <ID>.zip. If file is > 2gb the zip64 extensions
+        will be used.
+        """
+        vid_file = os.path.join(cdf_dir, cdf.get_file_name())
+        zip_file_name = str(cdf.get_id()) + ZIP_SUFFIX
+        dest_zip = os.path.join(cdf_dir, zip_file_name)
+
+        logger.debug('Creating zip file: ' + dest_zip)
+        zf = zipfile.ZipFile(dest_zip, mode='w', allowZip64=True)
+        try:
+                zf.write(vid_file)
+        finally:
+            zf.close()
+
+        newcdf = CILDataFile(cdf.get_id())
+        newcdf.copy(cdf)
+        newcdf.set_file_name(zip_file_name)
+        newcdf.set_mime_type(ZIP_MIMETYPE)
+        newcdf.set_file_size(os.path.getsize(dest_zip))
+        newcdf.set_checksum(md5(dest_zip))
+        return newcdf
+
+    def _change_suffix_on_cildatafile(self, cdf, new_suffix, cdf_dir):
+        """Changes suffix on CILDataFile by renaming and updating
+        object
+        :returns CILDataFile: with get_file_name() updated with new suffix
+        """
+        new_file_name = str(cdf.get_id()) + new_suffix
+        new_file = os.path.join(cdf_dir, new_file_name)
+
+        old_file = os.path.join(cdf_dir, cdf.get_file_name())
+
+        os.rename(old_file, new_file)
+        cdf.set_file_name(new_file_name)
+        return cdf
+
+    def _get_raw_video_extension(self, cdf):
+        """hi
+        """
+        if cdf.get_headers() is None:
+            raise ValueError('No headers found for ' +
+                             str(cdf.get_file_name()))
+
+        if CONTENT_DISPOSITION not in cdf.get_headers():
+            raise ValueError(CONTENT_DISPOSITION + ' NOT in headers for ' +
+                             str(cdf.get_file_name()))
+
+        c_disp = cdf.get_headers()[CONTENT_DISPOSITION]
+        newsuffix = self._extract_suffix_from_content_disposition(c_disp)
+
+        newsuffix = '.' + newsuffix
+        self._compare_extension_with_mimetype(cdf, newsuffix)
+        return newsuffix
+
+    def _extract_suffix_from_content_disposition(self, content_disp):
+        """Extracts the suffix found after filename=<FILE>.<SUFFIX>
+           in `content_disp` string passed in.
+        """
+        if content_disp is None:
+            raise ValueError('content_disp cannot be None')
+
+        if 'filename=' not in content_disp:
+            raise ValueError('filename= not found in ' +
+                             CONTENT_DISPOSITION)
+
+        return re.sub('^.*\.', '', content_disp)
+
+    def _compare_extension_with_mimetype(self, cdf, newsuffix):
+        """Sees if suffix passed in via `newsuffix` matches
+        mimetype.
+        """
+        if cdf.get_mime_type() is None:
+            logger.error('For ' + cdf.get_file_name() + ' mimetype is None')
+            return
+
+        guessed_exts = mimetypes.guess_all_extensions(cdf.get_mime_type())
+
+        if newsuffix not in guessed_exts:
+            logger.error('For ' + cdf.get_file_name() +
+                         ' content-disposition says file is of type: ' +
+                         newsuffix +
+                         ' but this does not match the mimetype: ' +
+                         cdf.get_mime_type())
