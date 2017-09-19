@@ -16,6 +16,7 @@ from cildata_util.dbutil import CILDataFileFoundInFilesystemFilter
 from cildata_util.dbutil import CILDataFileNoRawFilter
 from cildata_util.dbutil import CILDataFileFromJsonFilesFactory
 from cildata_util.dbutil import CILDataFileFailedDownloadFilter
+from cildata_util.dbutil import CILDataFileListFromJsonPickleFactory
 
 logger = logging.getLogger('cildata_util.cildatadownloader')
 
@@ -68,9 +69,44 @@ def _retry_download_of_failed(theargs):
     filt_cdf = no_rawfilt.get_cildatafiles(failfilt_cdf)
     logger.info('Failed entries: ' + str(len(filt_cdf)))
 
+    reader = CILDataFileListFromJsonPickleFactory()
+    writer = CILDataFileJsonPickleWriter()
 
     for cdf in filt_cdf:
-        sys.stdout.write(cdf.get_file_name() + '\n')
+        if theargs.id is not None:
+            if theargs.id != str(cdf.get_id()):
+                continue
+
+        if cdf.get_is_video():
+            base_dir = os.path.join(videos_destdir, str(cdf.get_id()))
+        else:
+            base_dir = os.path.join(images_destdir, str(cdf.get_id()))
+
+        destfile = os.path.join(base_dir, cdf.get_file_name())
+        if os.path.isfile(destfile):
+            logger.info(destfile + ' exists. Removing...')
+            os.remove(destfile)
+        newcdf = dbutil.download_cil_data_file(base_dir, cdf,
+                                               loadbaseurl=True,
+                                               download_direct_to_dest=True)
+        jsonfile = os.path.join(base_dir, str(cdf.get_id()) + dbutil.JSON_SUFFIX)
+
+        logger.debug('Making backup of ' + jsonfile)
+        dbutil.make_backup_of_json(jsonfile)
+
+        cdf_list = reader.get_cildatafiles(jsonfile)
+
+        newcdf_list = []
+        for entry in cdf_list:
+            if entry.get_file_name() == newcdf.get_file_name():
+                logger.info('Updating ' + newcdf.get_file_name())
+                newcdf_list.append(newcdf)
+                continue
+            newcdf_list.append(entry)
+
+        writer.writeCILDataFileListToFile(jsonfile, newcdf_list,
+                                          skipsuffixappend=True)
+
     return 0
 
 
