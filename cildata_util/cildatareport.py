@@ -25,9 +25,6 @@ def _parse_arguments(desc, args):
                         'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help="Set the logging level (default WARNING)",
                         default='WARNING')
-    parser.add_argument("--skiprawfalse", action='store_true',
-                        help='If set dont count .raw file entries '
-                             'where has raw is false')
     parser.add_argument("--printfailed", action='store_true',
                         help='If set output file names of files that'
                              'failed to download')
@@ -50,13 +47,10 @@ def _generate_report(theargs):
     cdf_list = factory.get_cildatafiles(download_dir)
     logger.info('Unfiltered list count: ' + str(len(cdf_list)))
 
-    if theargs.skiprawfalse is True:
-        filt_cdf_list = noraw_filt.get_cildatafiles(cdf_list)
-        logger.info('Skipped raw without download count: ' +
-                    str(len(filt_cdf_list)))
-        not_supposed_to_have_raw = len(cdf_list) - len(filt_cdf_list)
-    else:
-        filt_cdf_list = cdf_list
+    filt_cdf_list = noraw_filt.get_cildatafiles(cdf_list)
+    logger.info('Skipped raw without download count: ' +
+                str(len(filt_cdf_list)))
+    not_supposed_to_have_raw = len(cdf_list) - len(filt_cdf_list)
 
     if theargs.printfailed is True:
         sys.stdout.write('Failed\n')
@@ -93,10 +87,9 @@ def _generate_report(theargs):
     sys.stdout.write('Number unique IDs: ' + str(num_unique_ids) +
                      ' (failed: ' + str(num_failed_ids) + ')\n')
 
-    if theargs.skiprawfalse is True:
-        sys.stdout.write('Number entries that are NOT supposed to have '
-                         'raw file: ' +
-                         str(not_supposed_to_have_raw) + '\n')
+    sys.stdout.write('Number entries that are NOT supposed to have '
+                     'raw file: ' +
+                     str(not_supposed_to_have_raw) + '\n')
     sys.stdout.write('-----------------\n')
     for entry in mimetypes.keys():
         sys.stdout.write('\t' + str(entry) + ' ==> ' +
