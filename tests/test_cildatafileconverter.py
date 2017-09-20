@@ -184,11 +184,9 @@ class TestCILDataFileConverter(unittest.TestCase):
             zf.write(myvid2)
             zf.close()
             converter = CILDataFileConverter()
-            try:
-                converter._extract_image_from_zip(cdf, temp_dir)
-                self.fail('Expected ValueError')
-            except ValueError as e:
-                self.assertTrue('Expected single file ' in str(e))
+            newcdfs = converter._extract_image_from_zip(cdf, temp_dir)
+            self.assertEqual(len(newcdfs), 2)
+
 
         finally:
             shutil.rmtree(temp_dir)
@@ -210,9 +208,9 @@ class TestCILDataFileConverter(unittest.TestCase):
             zf.close()
             converter = CILDataFileConverter()
 
-            newcdf = converter._extract_image_from_zip(cdf, temp_dir)
-            self.assertEqual(newcdf.get_file_name(), '123_orig.avi')
-            self.assertEqual(newcdf.get_mime_type(), 'video/x-msvideo')
+            newcdfs = converter._extract_image_from_zip(cdf, temp_dir)
+            self.assertEqual(newcdfs[0].get_file_name(), '123_orig.avi')
+            self.assertEqual(newcdfs[0].get_mime_type(), 'video/x-msvideo')
         finally:
             shutil.rmtree(temp_dir)
 
@@ -238,7 +236,7 @@ class TestCILDataFileConverter(unittest.TestCase):
             converter = CILDataFileConverter()
             res = converter._convert_video(cdf, temp_dir)
             self.assertEqual(len(res), 2)
-            self.assertEqual(res[0].get_file_name(), cdf.get_file_name())
+            self.assertEqual(res[0].get_file_name(), '123.avi')
             self.assertFalse(os.path.isfile(myvid))
             zfile = os.path.join(temp_dir, res[1].get_file_name())
             self.assertTrue(os.path.isfile(zfile))
@@ -287,8 +285,7 @@ class TestCILDataFileConverter(unittest.TestCase):
             converter = CILDataFileConverter()
             res = converter._convert_image(cdf, temp_dir)
             self.assertEqual(len(res), 2)
-            self.assertEqual(res[0].get_file_name(), cdf.get_file_name())
-            self.assertTrue(os.path.isfile(myvid))
+            self.assertEqual(res[0].get_file_name(), '123.zip')
             zfile = os.path.join(temp_dir, res[1].get_file_name())
             self.assertTrue(os.path.isfile(zfile))
             orig_file = os.path.join(temp_dir, '123_orig.gif')
