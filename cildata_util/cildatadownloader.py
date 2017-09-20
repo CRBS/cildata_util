@@ -46,6 +46,16 @@ def _parse_arguments(desc, args):
     parser.add_argument('--retryfailed', action='store_true',
                         help='Going off of filesystem retry any failed'
                              'downloads')
+    parser.add_argument('--numretries', type=int, default=2,
+                        help='Number of attempts to make at downloading'
+                             ' a file')
+    parser.add_argument('--retrysleep', type=int, default=30,
+                        help='Number of seconds to wait before'
+                             ' retrying a download')
+    parser.add_argument('--timeout', type=int, default=120,
+                        help='Number of seconds to wait for response'
+                             ' from http when downloading a file')
+
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
     return parser.parse_args(args)
@@ -88,7 +98,10 @@ def _retry_download_of_failed(theargs):
             os.remove(destfile)
         newcdf = dbutil.download_cil_data_file(base_dir, cdf,
                                                loadbaseurl=True,
-                                               download_direct_to_dest=True)
+                                               download_direct_to_dest=True,
+                                               numretries=theargs.numretries,
+                                               retry_sleep=theargs.retrysleep,
+                                               timeout=theargs.timeout)
         jsonfile = os.path.join(base_dir, str(cdf.get_id()) + dbutil.JSON_SUFFIX)
 
         logger.debug('Making backup of ' + jsonfile)
@@ -169,7 +182,10 @@ def _download_cil_data_files(theargs):
             last_id = entry.get_id()
             last_outdir = out_dir
             cdf = dbutil.download_cil_data_file(out_dir, entry,
-                                                loadbaseurl=loadbaseurl)
+                                                loadbaseurl=loadbaseurl,
+                                                numretries=theargs.numretries,
+                                                retry_sleep=theargs.retrysleep,
+                                                timeout=theargs.timeout)
             same_id_cdf_list.append(cdf)
 
         if len(same_id_cdf_list) > 0:

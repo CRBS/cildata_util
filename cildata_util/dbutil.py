@@ -60,7 +60,7 @@ def download_file(url, dest_dir, numretries=2,
     dest_file = os.path.join(dest_dir, local_filename)
     logger.debug('Downloading from ' + url + ' to ' + dest_file)
     retry_count = 0
-    while retry_count < numretries:
+    while retry_count <= numretries:
         try:
             if session is not None:
                 logger.debug('Using custom session object for get')
@@ -71,6 +71,14 @@ def download_file(url, dest_dir, numretries=2,
             with open(dest_file, 'wb') as f:
                 shutil.copyfileobj(r.raw, f)
             logger.debug('Headers: ' + str(r.headers))
+            if r.status_code is not 200:
+                retry_count += 1
+                logger.error('Got ' + str(r.status_code) + ' trying to '
+                             'download. Sleeping ' + str(retry_sleep) +
+                             ' seconds and will retry again # ' +
+                             str(retry_count))
+                time.sleep(retry_sleep)
+                continue
             return local_filename, r.headers, r.status_code
         except Exception as e:
             retry_count += 1
@@ -159,7 +167,8 @@ def convert_response_headers_to_dict(headers):
 
 
 def download_cil_data_file(destination_dir, cdf, loadbaseurl=False,
-                           download_direct_to_dest=False):
+                           download_direct_to_dest=False,
+                           numretries=2,retry_sleep=30, timeout=120):
 
     base_url = 'http://www.cellimagelibrary.org/'
     omero_url = 'http://grackle.crbs.ucsd.edu:8080/OmeroWebService/images/'
@@ -192,7 +201,10 @@ def download_cil_data_file(destination_dir, cdf, loadbaseurl=False,
     (local_file, headers,
      status) = download_file(download_url +
                              cdf.get_file_name(),
-                             out_dir)
+                             out_dir,
+                             numretries=numretries,
+                             retry_sleep=retry_sleep,
+                             timeout=timeout)
 
     logger.debug('status: ' + str(status))
     if headers is not None:
@@ -796,10 +808,13 @@ class CILDataFileConverter(object):
             raise ValueError('For id ' + str(cdf.get_id()) +
                              ' file name is NOT set')
 
-        if cdf.get_is_video() is not True:
-            return self._convert_image(cdf)
+        if cdf_dir is None:
+            raise ValueError('cdf_dir cannot be None')
 
-        return self._convert_video(cdf)
+        if cdf.get_is_video() is not True:
+            return self._convert_image(cdf, cdf_dir)
+
+        return self._convert_video(cdf, cdf_dir)
 
     def _convert_video(self, cdf, cdf_dir):
         """Converts video
