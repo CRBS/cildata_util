@@ -39,9 +39,33 @@ class TestCILDataFileConverter(unittest.TestCase):
 
         cdf.set_download_success(True)
         try:
-            converter.convert(cdf, None)
+            converter.convert(cdf, '/foo')
         except ValueError as e:
             self.assertEqual(str(e), 'For id 123 file name is NOT set')
+
+        cdf.set_file_name('123.raw')
+        try:
+            converter.convert(cdf, None)
+        except ValueError as e:
+            self.assertEqual(str(e), 'cdf_dir cannot be None')
+
+    def test_convert(self):
+        converter = CILDataFileConverter()
+        self.assertEqual(converter.convert(None, None), None)
+
+        cdf = CILDataFile(123)
+        cdf.set_download_success(True)
+        cdf.set_file_name('123.gif')
+        cdf.set_is_video(True)
+        res = converter.convert(cdf, '/foo')
+        self.assertEqual(cdf.get_file_name(), res.get_file_name())
+
+        cdf = CILDataFile(123)
+        cdf.set_download_success(True)
+        cdf.set_file_name('123.gif')
+        cdf.set_is_video(None)
+        res = converter.convert(cdf, '/foo')
+        self.assertEqual(cdf.get_file_name(), res.get_file_name())
 
     def test_compare_extension_with_mimetype(self):
         converter = CILDataFileConverter()
@@ -271,7 +295,3 @@ class TestCILDataFileConverter(unittest.TestCase):
             self.assertTrue(os.path.isfile(orig_file))
         finally:
             shutil.rmtree(temp_dir)
-
-    def test_convert(self):
-        # TODO Complete testing this method
-        self.assertEqual(1, 2)
