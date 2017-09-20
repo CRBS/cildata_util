@@ -194,7 +194,7 @@ class TestCILDataFileConverter(unittest.TestCase):
     def test_extract_image_from_zip_success(self):
         temp_dir = tempfile.mkdtemp()
         try:
-            myvid = os.path.join(temp_dir, '123.avi')
+            myvid = os.path.join(temp_dir, '123.AVI')
             with open(myvid, 'w') as f:
                 f.write('hi')
                 f.flush()
