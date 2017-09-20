@@ -508,6 +508,37 @@ class CILDataFileNoRawFilter(object):
         return filtered_cdf_list
 
 
+class CILDataFileOnlyRawWithHasRawFalseFilter(object):
+    """Filter that keeps only CILDataFile image objects
+       that end with .raw and whose get_has_raw() is
+       set to False
+    """
+    def __init__(self):
+        """
+        COnstructor
+        """
+
+    def get_cildatafiles(self, cildatafile_list):
+        """Filters out any CILDataFile objects as described
+           in constructor.
+        :raises AttributeError: if CILDataFile does not have values for
+                                get_file_name()
+        :returns: filtered list of CILDataFile objects
+        """
+        if cildatafile_list is None:
+            logger.debug('Received None so returning None')
+            return None
+
+        filtered_cdf_list = []
+        for cdf in cildatafile_list:
+            if cdf.get_is_video() is not True:
+                if cdf.get_file_name().endswith(RAW_SUFFIX):
+                    if cdf.get_has_raw() is False:
+                        filtered_cdf_list.append(cdf)
+
+        return filtered_cdf_list
+
+
 class CILDataFileFailedDownloadFilter(object):
     """Filter that retreives CILDataFile objects that
        failed to download, excluding .raw image
@@ -844,11 +875,20 @@ class CILDataFileConverter(object):
         if not zipfile.is_zipfile(old_file):
             raise ValueError(old_file + ' is NOT a zip file')
 
-        cdf = self._change_suffix_on_cildatafile(cdf, ZIP_SUFFIX,
-                                                 cdf_dir)
+        try:
+            cdf = self._change_suffix_on_cildatafile(cdf, ZIP_SUFFIX,
+                                                     cdf_dir)
 
-        extracted_cdf = self._extract_image_from_zip(cdf, cdf_dir)
-        return [cdf, extracted_cdf]
+            extracted_cdfs = self._extract_image_from_zip(cdf, cdf_dir)
+            new_cdf_list = [cdf]
+            new_cdf_list.extend(extracted_cdfs)
+            return new_cdf_list
+        except ValueError:
+            logger.info('Renaming ' + cdf.get_file_name() + ' back to '
+                                                            ' .raw')
+            self._change_suffix_on_cildatafile(cdf, RAW_SUFFIX,
+                                               cdf_dir)
+            raise
 
     def _extract_image_from_zip(self, cdf, cdf_dir):
         """Extracts image from zip file specified by CILDataFile `cdf` and
@@ -857,30 +897,33 @@ class CILDataFileConverter(object):
         zip_file = os.path.join(cdf_dir, cdf.get_file_name())
         zf = zipfile.ZipFile(zip_file, mode='r', allowZip64=True)
         zipinfo_entries = zf.infolist()
-        if len(zipinfo_entries) is not 1:
-            raise ValueError('Expected single file in ' + zip_file +
-                             ' but found: ' + str(len(zipinfo_entries)) +
-                             ' entries')
+        if len(zipinfo_entries) is 0:
+            raise ValueError('Expected at least 1 file in ' + zip_file +
+                             ' but found none')
+
         tmpdir = os.path.join(cdf_dir, 'tmp')
+        newcdf_list = []
         try:
             os.makedirs(tmpdir, mode=0o755)
+            for zentry in zipinfo_entries:
 
-            extracted_file = zf.extract(zipinfo_entries[0], path=tmpdir)
-            suffix = re.sub('^.*\.','', zipinfo_entries[0].filename)
-            suffix = '.' + suffix
-            new_file_name = str(cdf.get_id()) + ORIG_IDENTIFIER + suffix
-            new_file = os.path.join(cdf_dir, new_file_name)
-            os.rename(extracted_file, new_file)
+                extracted_file = zf.extract(zentry, path=tmpdir)
+                suffix = re.sub('^.*\.', '', zentry.filename)
+                suffix = '.' + suffix.lower()
+                new_file_name = str(cdf.get_id()) + ORIG_IDENTIFIER + suffix
+                new_file = os.path.join(cdf_dir, new_file_name)
+                os.rename(extracted_file, new_file)
+                newcdf = CILDataFile(cdf.get_id())
+                newcdf.copy(cdf)
+                newcdf.set_file_name(new_file_name)
+                newcdf.set_localfile(new_file_name)
+                newcdf.set_mime_type(mimetypes.guess_type(new_file_name)[0])
+                newcdf.set_file_size(os.path.getsize(new_file))
+                newcdf.set_checksum(md5(new_file))
+                newcdf_list.append(newcdf)
+            return newcdf_list
         finally:
             shutil.rmtree(tmpdir)
-
-        newcdf = CILDataFile(cdf.get_id())
-        newcdf.copy(cdf)
-        newcdf.set_file_name(new_file_name)
-        newcdf.set_mime_type(mimetypes.guess_type(new_file_name)[0])
-        newcdf.set_file_size(os.path.getsize(new_file))
-        newcdf.set_checksum(md5(new_file))
-        return newcdf
 
     def _create_video_zip_file(self, cdf, cdf_dir):
         """Takes file specified in get_file_name() and puts it into
@@ -901,6 +944,7 @@ class CILDataFileConverter(object):
         newcdf = CILDataFile(cdf.get_id())
         newcdf.copy(cdf)
         newcdf.set_file_name(zip_file_name)
+        newcdf.set_localfile(zip_file_name)
         newcdf.set_mime_type(ZIP_MIMETYPE)
         newcdf.set_file_size(os.path.getsize(dest_zip))
         newcdf.set_checksum(md5(dest_zip))
@@ -917,8 +961,11 @@ class CILDataFileConverter(object):
         old_file = os.path.join(cdf_dir, cdf.get_file_name())
 
         os.rename(old_file, new_file)
-        cdf.set_file_name(new_file_name)
-        return cdf
+        newcdf = CILDataFile(cdf.get_id())
+        newcdf.copy(cdf)
+        newcdf.set_file_name(new_file_name)
+        newcdf.set_localfile(new_file_name)
+        return newcdf
 
     def _get_raw_video_extension(self, cdf):
         """hi
