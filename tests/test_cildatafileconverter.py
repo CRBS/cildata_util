@@ -186,8 +186,6 @@ class TestCILDataFileConverter(unittest.TestCase):
             converter = CILDataFileConverter()
             newcdfs = converter._extract_image_from_zip(cdf, temp_dir)
             self.assertEqual(len(newcdfs), 2)
-
-
         finally:
             shutil.rmtree(temp_dir)
 
