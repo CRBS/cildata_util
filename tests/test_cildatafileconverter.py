@@ -115,10 +115,16 @@ class TestCILDataFileConverter(unittest.TestCase):
                              ' NOT in headers for 123.raw')
 
         headers = dict()
-        headers[dbutil.CONTENT_DISPOSITION] = 'attachment; filename=10 2.avi'
+        headers[dbutil.CONTENT_DISPOSITION] = 'attachment; filename=10 2.AVI'
         cdf.set_headers(headers)
         res = converter._get_raw_video_extension(cdf)
         self.assertEqual(res, '.avi')
+
+        headers = dict()
+        headers[dbutil.CONTENT_DISPOSITION] = 'attachment; filename=10 2.mpg'
+        cdf.set_headers(headers)
+        res = converter._get_raw_video_extension(cdf)
+        self.assertEqual(res, '.mpg')
 
     def test_change_suffix_on_cildatafile(self):
         temp_dir = tempfile.mkdtemp()
@@ -128,8 +134,9 @@ class TestCILDataFileConverter(unittest.TestCase):
             open(basefile, 'a').close()
             cdf = CILDataFile(123)
             cdf.set_file_name(str(cdf.get_id()) + dbutil.RAW_SUFFIX)
-            converter._change_suffix_on_cildatafile(cdf, '.avi', temp_dir)
-
+            newcdf = converter._change_suffix_on_cildatafile(cdf,
+                                                             '.avi', temp_dir)
+            self.assertEqual(newcdf.get_mime_type(), 'video/x-msvideo')
             self.assertEqual(os.path.isfile(basefile), False)
 
             newfile = os.path.join(temp_dir, '123.avi')
@@ -149,16 +156,16 @@ class TestCILDataFileConverter(unittest.TestCase):
             cdf.set_file_name('123.avi')
 
             converter = CILDataFileConverter()
-            newcdf = converter._create_video_zip_file(cdf, temp_dir)
+            newcdf = converter._create_zip_file(cdf, temp_dir)
             self.assertEqual(newcdf.get_file_name(), str(cdf.get_id()) +
                              dbutil.ZIP_SUFFIX)
             self.assertEqual(newcdf.get_mime_type(), dbutil.ZIP_MIMETYPE)
-            self.assertEqual(newcdf.get_file_size(), 142)
+            self.assertEqual(newcdf.get_file_size(), 122)
             self.assertTrue(newcdf.get_checksum(), 'hi')
             zfile = os.path.join(temp_dir, newcdf.get_file_name())
             self.assertTrue(os.path.isfile(zfile))
             zf = zipfile.ZipFile(zfile, mode='r', allowZip64=True)
-            self.assertTrue(zf.infolist()[0].filename.endswith('123.avi'))
+            self.assertEqual(zf.infolist()[0].filename, '123/123.avi')
         finally:
             shutil.rmtree(temp_dir)
 
