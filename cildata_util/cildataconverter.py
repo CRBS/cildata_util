@@ -70,6 +70,10 @@ def _convert_data(theargs):
     """Examine all downloaded data and retry any
        failed entries
     """
+    raise ValueError('Make sure CILDataFileConverter._create_zip_file()'
+                     'is tested and works. Am in middle of converting it'
+                     'to now take an array of CILDataFile objects and package'
+                     'them into a folder <ID>/ with names <ID>.<ext>')
     abs_destdir = os.path.abspath(theargs.downloaddir)
     images_destdir = os.path.join(abs_destdir, dbutil.IMAGES_DIR)
     videos_destdir = os.path.join(abs_destdir, dbutil.VIDEOS_DIR)
@@ -94,6 +98,12 @@ def _convert_data(theargs):
             base_dir = os.path.join(videos_destdir, str(cdf.get_id()))
         else:
             base_dir = os.path.join(images_destdir, str(cdf.get_id()))
+            jsonfile = os.path.join(base_dir, str(cdf.get_id()) + dbutil.JSON_SUFFIX)
+            if not os.path.isfile(jsonfile):
+                logger.error(str(cdf.get_file_name()) + ' was guessed to be image, '
+                                                        'but this is wrong'
+                                                        'going with video')
+                base_dir = os.path.join(videos_destdir, str(cdf.get_id()))
 
         if theargs.onlycheckzipfiles is True:
             _check_zip_files(cdf, base_dir)
