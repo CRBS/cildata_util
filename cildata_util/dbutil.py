@@ -861,7 +861,7 @@ class CILDataFileConverter(object):
         cdf = self._change_suffix_on_cildatafile(cdf, new_suffix, cdf_dir)
 
         # create zip with new file in it.
-        zipcdf = self._create_video_zip_file(cdf, cdf_dir)
+        zipcdf = self._create_zip_file(cdf, cdf_dir)
 
         return [cdf, zipcdf]
 
@@ -925,30 +925,35 @@ class CILDataFileConverter(object):
         finally:
             shutil.rmtree(tmpdir)
 
-    def _create_video_zip_file(self, cdf, cdf_dir):
+    def _create_zip_file(self, cdf_list, cdf_dir):
         """Takes file specified in get_file_name() and puts it into
         a zip file named <ID>.zip. If file is > 2gb the zip64 extensions
         will be used.
         """
-        vid_file = os.path.join(cdf_dir, cdf.get_file_name())
-        zip_file_name = str(cdf.get_id()) + ZIP_SUFFIX
+        zip_file_name = str(cdf_list[0].get_id()) + ZIP_SUFFIX
         dest_zip = os.path.join(cdf_dir, zip_file_name)
-
         logger.debug('Creating zip file: ' + dest_zip)
+
         zf = zipfile.ZipFile(dest_zip, mode='w', allowZip64=True)
+        newcdf_list = []
         try:
-                zf.write(vid_file)
+            for cdf in cdf_list:
+                vid_file = os.path.join(cdf_dir, cdf.get_file_name())
+                arcpath = os.path.join(str(cdf.get_id()),
+                                       os.path.basename(vid_file))
+                zf.write(vid_file, arcname=arcpath)
+                newcdf = CILDataFile(cdf.get_id())
+                newcdf.copy(cdf)
+                newcdf.set_file_name(zip_file_name)
+                newcdf.set_localfile(zip_file_name)
+                newcdf.set_mime_type(ZIP_MIMETYPE)
+                newcdf.set_file_size(os.path.getsize(dest_zip))
+                newcdf.set_checksum(md5(dest_zip))
+                newcdf_list.append(newcdf)
         finally:
             zf.close()
 
-        newcdf = CILDataFile(cdf.get_id())
-        newcdf.copy(cdf)
-        newcdf.set_file_name(zip_file_name)
-        newcdf.set_localfile(zip_file_name)
-        newcdf.set_mime_type(ZIP_MIMETYPE)
-        newcdf.set_file_size(os.path.getsize(dest_zip))
-        newcdf.set_checksum(md5(dest_zip))
-        return newcdf
+        return newcdf_list
 
     def _change_suffix_on_cildatafile(self, cdf, new_suffix, cdf_dir):
         """Changes suffix on CILDataFile by renaming and updating
@@ -965,6 +970,7 @@ class CILDataFileConverter(object):
         newcdf.copy(cdf)
         newcdf.set_file_name(new_file_name)
         newcdf.set_localfile(new_file_name)
+        newcdf.set_mime_type(mimetypes.guess_type(new_file_name)[0])
         return newcdf
 
     def _get_raw_video_extension(self, cdf):
@@ -981,7 +987,7 @@ class CILDataFileConverter(object):
         c_disp = cdf.get_headers()[CONTENT_DISPOSITION]
         newsuffix = self._extract_suffix_from_content_disposition(c_disp)
 
-        newsuffix = '.' + newsuffix
+        newsuffix = '.' + newsuffix.lower()
         self._compare_extension_with_mimetype(cdf, newsuffix)
         return newsuffix
 
