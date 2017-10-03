@@ -145,7 +145,7 @@ class TestCILDataFileConverter(unittest.TestCase):
         finally:
             shutil.rmtree(temp_dir)
 
-    def test_create_video_zip_file(self):
+    def test_create_zip_file_with_video_inside(self):
         temp_dir = tempfile.mkdtemp()
         try:
             myvid = os.path.join(temp_dir, '123.avi')
@@ -156,16 +156,59 @@ class TestCILDataFileConverter(unittest.TestCase):
             cdf.set_file_name('123.avi')
 
             converter = CILDataFileConverter()
-            newcdf = converter._create_zip_file(cdf, temp_dir)
-            self.assertEqual(newcdf.get_file_name(), str(cdf.get_id()) +
+            newcdf = converter._create_zip_file([cdf], temp_dir)
+            self.assertEqual(newcdf[0].get_file_name(), str(cdf.get_id()) +
                              dbutil.ZIP_SUFFIX)
-            self.assertEqual(newcdf.get_mime_type(), dbutil.ZIP_MIMETYPE)
-            self.assertEqual(newcdf.get_file_size(), 122)
-            self.assertTrue(newcdf.get_checksum(), 'hi')
-            zfile = os.path.join(temp_dir, newcdf.get_file_name())
+            self.assertEqual(newcdf[0].get_mime_type(), dbutil.ZIP_MIMETYPE)
+            self.assertEqual(newcdf[0].get_file_size(), 122)
+            self.assertTrue(newcdf[0].get_checksum(), 'hi')
+            zfile = os.path.join(temp_dir, newcdf[0].get_file_name())
             self.assertTrue(os.path.isfile(zfile))
             zf = zipfile.ZipFile(zfile, mode='r', allowZip64=True)
             self.assertEqual(zf.infolist()[0].filename, '123/123.avi')
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_create_zip_file_with_multiple_files(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            myvid = os.path.join(temp_dir, '123.avi')
+            with open(myvid, 'w') as f:
+                f.write('hi')
+                f.flush()
+            cdf = CILDataFile(123)
+            cdf.set_file_name('123.avi')
+
+            converter = CILDataFileConverter()
+            newcdf = converter._create_zip_file([cdf], temp_dir)
+            self.assertEqual(newcdf[0].get_file_name(), str(cdf.get_id()) +
+                             dbutil.ZIP_SUFFIX)
+            self.assertEqual(newcdf[0].get_mime_type(), dbutil.ZIP_MIMETYPE)
+            self.assertEqual(newcdf[0].get_file_size(), 122)
+            self.assertTrue(newcdf[0].get_checksum(), 'hi')
+            zfile = os.path.join(temp_dir, newcdf[0].get_file_name())
+            self.assertTrue(os.path.isfile(zfile))
+            zf = zipfile.ZipFile(zfile, mode='r', allowZip64=True)
+            self.assertEqual(zf.infolist()[0].filename, '123/123.avi')
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_extract_image_from_zip_with_nofiles_inside(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            cdf = CILDataFile(123)
+            cdf.set_file_name(str(cdf.get_id()) + dbutil.ZIP_SUFFIX)
+            z_file = os.path.join(temp_dir, cdf.get_file_name())
+            zf = zipfile.ZipFile(z_file, mode='w')
+            zf.close()
+
+            converter = CILDataFileConverter()
+            try:
+                converter._extract_image_from_zip(cdf, temp_dir)
+                self.fail('Expected ValueError')
+            except ValueError as e:
+                self.assertEqual(str(e), 'Expected at least 1 file in ' +
+                                 z_file + ' but found none')
         finally:
             shutil.rmtree(temp_dir)
 
@@ -270,6 +313,28 @@ class TestCILDataFileConverter(unittest.TestCase):
                 self.fail('Expected ValueError')
             except ValueError as e:
                 self.assertTrue('NOT a zip file' in str(e))
+        finally:
+            shutil.rmtree(temp_dir)
+
+    def test_convert_image_empty_zip(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            cdf = CILDataFile(123)
+            cdf.set_file_name(str(cdf.get_id()) + dbutil.RAW_SUFFIX)
+            r_file = os.path.join(temp_dir, cdf.get_file_name())
+            z_file = os.path.join(temp_dir, str(cdf.get_id()) +
+                                  dbutil.ZIP_SUFFIX)
+            zf = zipfile.ZipFile(r_file, mode='w')
+
+            zf.close()
+
+            converter = CILDataFileConverter()
+            try:
+                converter._convert_image(cdf, temp_dir)
+                self.fail('Expected ValueError')
+            except ValueError as e:
+                self.assertEqual(str(e), 'Expected at least 1 file in ' +
+                                 z_file + ' but found none')
         finally:
             shutil.rmtree(temp_dir)
 
