@@ -70,10 +70,6 @@ def _convert_data(theargs):
     """Examine all downloaded data and retry any
        failed entries
     """
-    raise ValueError('Make sure CILDataFileConverter._create_zip_file()'
-                     'is tested and works. Am in middle of converting it'
-                     'to now take an array of CILDataFile objects and package'
-                     'them into a folder <ID>/ with names <ID>.<ext>')
     abs_destdir = os.path.abspath(theargs.downloaddir)
     images_destdir = os.path.join(abs_destdir, dbutil.IMAGES_DIR)
     videos_destdir = os.path.join(abs_destdir, dbutil.VIDEOS_DIR)
