@@ -157,13 +157,10 @@ def convert_response_headers_to_dict(headers):
         return None
 
     header_dict = {}
-    try:
-        for k in headers.keys():
-            header_dict[k] = headers[k]
-        return header_dict
-    except Exception:
-        logger.exception('Caught exception parsing headers')
-    return None
+
+    for k in headers.keys():
+        header_dict[k] = headers[k]
+    return header_dict
 
 
 def download_cil_data_file(destination_dir, cdf, loadbaseurl=False,
@@ -508,37 +505,6 @@ class CILDataFileNoRawFilter(object):
         return filtered_cdf_list
 
 
-class CILDataFileOnlyRawWithHasRawFalseFilter(object):
-    """Filter that keeps only CILDataFile image objects
-       that end with .raw and whose get_has_raw() is
-       set to False
-    """
-    def __init__(self):
-        """
-        COnstructor
-        """
-
-    def get_cildatafiles(self, cildatafile_list):
-        """Filters out any CILDataFile objects as described
-           in constructor.
-        :raises AttributeError: if CILDataFile does not have values for
-                                get_file_name()
-        :returns: filtered list of CILDataFile objects
-        """
-        if cildatafile_list is None:
-            logger.debug('Received None so returning None')
-            return None
-
-        filtered_cdf_list = []
-        for cdf in cildatafile_list:
-            if cdf.get_is_video() is not True:
-                if cdf.get_file_name().endswith(RAW_SUFFIX):
-                    if cdf.get_has_raw() is False:
-                        filtered_cdf_list.append(cdf)
-
-        return filtered_cdf_list
-
-
 class CILDataFileFailedDownloadFilter(object):
     """Filter that retreives CILDataFile objects that
        failed to download, excluding .raw image
@@ -732,26 +698,9 @@ class CILDataFileListFromJsonPickleFactory(object):
     """Factory class that creates CILDataFile objects
        by reading json pickle file
     """
-    def __init__(self, fixheaders=False):
+    def __init__(self):
         """Constructor
         """
-        self._fixheaders = fixheaders
-
-    def _get_fixed_header(self, header):
-        """Fixes messed up header object
-        """
-        if header is None:
-            return None
-        try:
-            header_dict = {}
-            for bkey in header['_store'].keys():
-                if bkey == 'py/object':
-                    continue
-                header_dict[header['_store'][bkey]['py/tuple'][0]] = header['_store'][bkey]['py/tuple'][1]
-            return header_dict
-        except KeyError:
-            logger.exception('Got a key error maybe this json has been fixed')
-            return header
 
     def get_cildatafiles(self, json_pickle_file):
         """Gets list of CILDataFile objects from json
@@ -778,10 +727,6 @@ class CILDataFileListFromJsonPickleFactory(object):
             tmpcdf = jsonpickle.decode(e)
             cdf = CILDataFile(tmpcdf.get_id())
             cdf.copy(tmpcdf)
-
-            if self._fixheaders is True:
-                cdf.set_headers(self._get_fixed_header(cdf.get_headers()))
-
             cdf_list.append(cdf)
         return cdf_list
 
@@ -861,9 +806,13 @@ class CILDataFileConverter(object):
         cdf = self._change_suffix_on_cildatafile(cdf, new_suffix, cdf_dir)
 
         # create zip with new file in it.
-        zipcdf = self._create_zip_file(cdf, cdf_dir)
+        zipcdf = self._create_zip_file([cdf], cdf_dir)
 
-        return [cdf, zipcdf]
+        cdf_list = list()
+        cdf_list.append(cdf)
+        cdf_list.extend(zipcdf)
+
+        return cdf_list
 
     def _convert_image(self, cdf, cdf_dir):
         """Converts image
@@ -875,20 +824,19 @@ class CILDataFileConverter(object):
         if not zipfile.is_zipfile(old_file):
             raise ValueError(old_file + ' is NOT a zip file')
 
-        try:
-            cdf = self._change_suffix_on_cildatafile(cdf, ZIP_SUFFIX,
-                                                     cdf_dir)
+        cdf = self._change_suffix_on_cildatafile(cdf, ZIP_SUFFIX,
+                                                 cdf_dir, makebackup=True)
 
-            extracted_cdfs = self._extract_image_from_zip(cdf, cdf_dir)
-            new_cdf_list = [cdf]
-            new_cdf_list.extend(extracted_cdfs)
-            return new_cdf_list
-        except ValueError:
-            logger.info('Renaming ' + cdf.get_file_name() + ' back to '
-                                                            ' .raw')
-            self._change_suffix_on_cildatafile(cdf, RAW_SUFFIX,
-                                               cdf_dir)
-            raise
+        extracted_cdfs = self._extract_image_from_zip(cdf, cdf_dir)
+        new_cdf_list = self._create_zip_file(extracted_cdfs,
+                                             cdf_dir)
+        new_cdf_list.extend(extracted_cdfs)
+
+        if os.path.isfile(old_file):
+            logger.debug('Removing: ' + old_file)
+            os.unlink(old_file)
+
+        return new_cdf_list
 
     def _extract_image_from_zip(self, cdf, cdf_dir):
         """Extracts image from zip file specified by CILDataFile `cdf` and
@@ -942,20 +890,21 @@ class CILDataFileConverter(object):
                 arcpath = os.path.join(str(cdf.get_id()),
                                        os.path.basename(vid_file))
                 zf.write(vid_file, arcname=arcpath)
-                newcdf = CILDataFile(cdf.get_id())
-                newcdf.copy(cdf)
-                newcdf.set_file_name(zip_file_name)
-                newcdf.set_localfile(zip_file_name)
-                newcdf.set_mime_type(ZIP_MIMETYPE)
-                newcdf.set_file_size(os.path.getsize(dest_zip))
-                newcdf.set_checksum(md5(dest_zip))
-                newcdf_list.append(newcdf)
         finally:
             zf.close()
+        newcdf = CILDataFile(cdf.get_id())
+        newcdf.copy(cdf)
+        newcdf.set_file_name(zip_file_name)
+        newcdf.set_localfile(zip_file_name)
+        newcdf.set_mime_type(ZIP_MIMETYPE)
+        newcdf.set_file_size(os.path.getsize(dest_zip))
+        newcdf.set_checksum(md5(dest_zip))
+        newcdf_list.append(newcdf)
 
         return newcdf_list
 
-    def _change_suffix_on_cildatafile(self, cdf, new_suffix, cdf_dir):
+    def _change_suffix_on_cildatafile(self, cdf, new_suffix, cdf_dir,
+                                      makebackup=False):
         """Changes suffix on CILDataFile by renaming and updating
         object
         :returns CILDataFile: with get_file_name() updated with new suffix
@@ -965,7 +914,14 @@ class CILDataFileConverter(object):
 
         old_file = os.path.join(cdf_dir, cdf.get_file_name())
 
-        os.rename(old_file, new_file)
+        if makebackup is True:
+            logger.debug('Making copy of ' + old_file + ' naming it ' +
+                         new_file)
+            shutil.copy(old_file, new_file)
+        else:
+            logger.debug('Renaming ' + old_file + ' to ' + new_file)
+            os.rename(old_file, new_file)
+
         newcdf = CILDataFile(cdf.get_id())
         newcdf.copy(cdf)
         newcdf.set_file_name(new_file_name)
