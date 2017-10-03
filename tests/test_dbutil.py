@@ -18,6 +18,7 @@ from cildata_util.dbutil import CILDataFileFromDatabaseFactory
 from cildata_util.dbutil import CILDataFileFoundInFilesystemFilter
 from cildata_util.dbutil import CILDataFileNoRawFilter
 from cildata_util.dbutil import CILDataFileFromJsonFilesFactory
+from cildata_util.dbutil import CILDataFileFailedDownloadFilter
 
 
 class FakeCILDataFile(object):
@@ -296,6 +297,42 @@ class TestDbutil(unittest.TestCase):
         res = filt.get_cildatafiles([cdf, cdf2, cdf3])
         self.assertEqual(res, [cdf, cdf2])
 
+    def test_cildatafilefailedownloadfilter(self):
+        filt = CILDataFileFailedDownloadFilter()
+
+        # try with None
+        res = filt.get_cildatafiles(None)
+        self.assertEqual(res, None)
+
+        # try with empty list
+        res = filt.get_cildatafiles([])
+        self.assertEqual(res, [])
+
+        # try with 1 cildatafile that is none for success
+        cdf = CILDataFile(123)
+        res = filt.get_cildatafiles([cdf])
+        self.assertEqual(res, [cdf])
+
+        # try with 1 cildatafile that is false for success
+        cdf.set_download_success(False)
+        res = filt.get_cildatafiles([cdf])
+        self.assertEqual(res, [cdf])
+
+        # try with 1 cildatafile that is True for success
+        cdf.set_download_success(True)
+        res = filt.get_cildatafiles([cdf])
+        self.assertEqual(res, [])
+
+        # try with 2 where one succeeded
+        cdf2 = CILDataFile(456)
+        res = filt.get_cildatafiles([cdf, cdf2])
+        self.assertEqual(res, [cdf2])
+
+        # try with 2 where both failed
+        cdf.set_download_success(False)
+        res = filt.get_cildatafiles([cdf, cdf2])
+        self.assertEqual(res, [cdf, cdf2])
+
     def test_cildatafilefromjsonfilesfactory(self):
         temp_dir = tempfile.mkdtemp()
         try:
@@ -336,7 +373,6 @@ class TestDbutil(unittest.TestCase):
             self.assertEqual(len(res), 2)
         finally:
             shutil.rmtree(temp_dir)
-
 
     def test_cildatafilepicklewriter_writeonecdf(self):
         cdf = CILDataFile(123)
@@ -456,7 +492,6 @@ class TestDbutil(unittest.TestCase):
         self.assertEqual(res[2].get_file_name(), '123' +
                          dbutil.RAW_SUFFIX)
         self.assertEqual(res[2].get_is_video(), False)
-
 
     def test_generate_cildatafiles_from_database_one_video_default(self):
         fac = CILDataFileFromDatabaseFactory('hi')
