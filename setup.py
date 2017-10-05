@@ -16,7 +16,8 @@ requirements = [
     "configparser",
     "pg8000",
     "requests",
-    "jsonpickle"
+    "jsonpickle",
+    "python-dateutil"
 ]
 
 setup_requirements = [
@@ -28,7 +29,8 @@ test_requirements = [
     "configparser",
     "pg8000",
     "requests",
-    "jsonpickle"
+    "jsonpickle",
+    "python-dateutil"
 ]
 
 setup(

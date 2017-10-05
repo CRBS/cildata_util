@@ -9,10 +9,12 @@ import os
 import cildata_util
 from cildata_util import config
 from cildata_util import dbutil
+from cildata_util.config import CILDatabaseConfig
+from cildata_util.dbutil import Database
 from cildata_util.dbutil import CILDataFileFromJsonFilesFactory
 from cildata_util.dbutil import CILDataFileListFromJsonPickleFactory
 from cildata_util.dbutil import CILDataFileNoRawFilter
-
+from cildata_util.dbutil import CILDataFileDatabaseUpdater
 logger = logging.getLogger('cildata_util.cildataupdatedb')
 
 
@@ -51,26 +53,37 @@ def _update_database(theargs):
     nofailedrawfilt = CILDataFileNoRawFilter()
     filt_cdf = nofailedrawfilt.get_cildatafiles(all_cdf)
 
-    reader = CILDataFileListFromJsonPickleFactory()
+    logger.debug('Reading database config')
+    dbconf = CILDatabaseConfig(theargs.databaseconf)
+    db = Database(dbconf)
+    conn = db.get_connection()
+    updater = CILDataFileDatabaseUpdater(conn)
 
-    for cdf in filt_cdf:
-        if theargs.id is not None:
-            if theargs.id != str(cdf.get_id()):
-                continue
-        logger.debug(cdf.get_file_name())
-        if cdf.get_is_video():
-            base_dir = os.path.join(videos_destdir, str(cdf.get_id()))
-        else:
-            base_dir = os.path.join(images_destdir, str(cdf.get_id()))
-            jsonfile = os.path.join(base_dir, str(cdf.get_id()) + dbutil.JSON_SUFFIX)
-            if not os.path.isfile(jsonfile):
-                logger.error(str(cdf.get_file_name()) + ' was guessed to be image, '
-                                                        'but this is wrong'
-                                                        'going with video')
+    try:
+        reader = CILDataFileListFromJsonPickleFactory()
+
+        for cdf in filt_cdf:
+            if theargs.id is not None:
+                if theargs.id != str(cdf.get_id()):
+                    continue
+            logger.debug(cdf.get_file_name())
+            if cdf.get_is_video():
                 base_dir = os.path.join(videos_destdir, str(cdf.get_id()))
+            else:
+                base_dir = os.path.join(images_destdir, str(cdf.get_id()))
+                jsonfile = os.path.join(base_dir, str(cdf.get_id()) + dbutil.JSON_SUFFIX)
+                if not os.path.isfile(jsonfile):
+                    logger.error(str(cdf.get_file_name()) + ' was guessed to be image, '
+                                                            'but this is wrong'
+                                                            'going with video')
+                    base_dir = os.path.join(videos_destdir, str(cdf.get_id()))
 
-        # update database
-        logger.debug('Update database')
+            # update database
+            logger.debug('Update database')
+            updater.insert_cildatafiles([cdf])
+    finally:
+        if conn is not None:
+            conn.close()
     return 0
 
 

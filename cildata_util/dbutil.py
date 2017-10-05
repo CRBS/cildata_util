@@ -10,7 +10,7 @@ import requests
 import time
 import mimetypes
 import zipfile
-
+from dateutil import parser
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +255,54 @@ class Database(object):
                               port=int(self._config.get_port()),
                               database=self._config.get_database_name())
         return conn
+
+
+class CILDataFileDatabaseUpdater(object):
+    """Inserts CILDataFile entries into database"""
+    def __init__(self, conn):
+        """Constructor
+        :param conn: Database connection already connected
+        """
+        self._conn = conn
+
+    def insert_cildatafiles(self, cildatafile_list):
+        """Inserts CILDataFile objects in cildatafile_list
+        into database.
+        :param cildatafile_list: list of CILDataFile objects
+        """
+        cursor = self._conn.cursor()
+        try:
+            for cdf in cildatafile_list:
+                logger.debug('Inserting ' + str(cdf.get_id()))
+                if cdf.get_is_video() is None:
+                    logger.debug('Setting is_video() to False cause '
+                                 'is_video() is set to None')
+                    cdf.set_is_video(False)
+
+                thedatestr = 'now()'
+                try:
+                    dt = parser.parse(cdf.get_headers()['Date'])
+                    thedatestr = "'" + dt.strftime('%Y-%m-%d %I:%M:%S') + "'"
+                except ValueError as e:
+                    logger.error('Unable to get date from header: ' + str(e))
+
+                insert_str = ("INSERT INTO cil_download_status(id,image_id," +
+                              "is_video,file_name,download_success," +
+                              "download_time,checksum,checksum_value,mime_type," +
+                              "num_of_bytes) " +
+                              "VALUES(nextval('cil_downloader_seq')," +
+                              str(cdf.get_id()) + "," +
+                              str(cdf.get_is_video()) + ",'" +
+                              cdf.get_file_name() + "'," +
+                              str(cdf.get_download_success()) + "," + thedatestr + ",True,'" +
+                              cdf.get_checksum() + "','" +
+                              cdf.get_mime_type() + "'," +
+                              str(cdf.get_file_size()) + ")")
+                logger.debug(insert_str)
+                cursor.execute(insert_str)
+        finally:
+            cursor.close()
+            self._conn.commit()
 
 
 class CILDataFile(object):
