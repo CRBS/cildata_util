@@ -278,7 +278,10 @@ class CILDataFileDatabaseUpdater(object):
                     logger.debug('Setting is_video() to False cause '
                                  'is_video() is set to None')
                     cdf.set_is_video(False)
-
+                if cdf.get_file_name().endswith(JPG_SUFFIX):
+                    logger.debug('Setting is_video() to False cause '
+                                 'file is jpg')
+                    cdf.set_is_video(False)
                 thedatestr = 'now()'
                 try:
                     dt = parser.parse(cdf.get_headers()['Date'])
