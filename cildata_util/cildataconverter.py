@@ -36,6 +36,9 @@ def _parse_arguments(desc, args):
                         help='If set examines all the zip files in images'
                              'and reports number of files and file names'
                              'found.')
+    parser.add_argument('--skipifrawmissing', action='store_true',
+                        help='If set skip any ids where no raw file is found'
+                             'in directory.')
 
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
@@ -104,6 +107,13 @@ def _convert_data(theargs):
         if theargs.onlycheckzipfiles is True:
             _check_zip_files(cdf, base_dir)
             continue
+
+        if theargs.skipifrawmissing is True:
+            raw = os.path.join(base_dir, str(cdf.get_id() + dbutil.RAW_SUFFIX))
+            if not os.path.isfile(raw):
+                logger.debug('Skipping... ' + str(cdf.get_id()) + ' no raw file found')
+                continue
+
         newcdfs = converter.convert(cdf, base_dir)
 
         jsonfile = os.path.join(base_dir, str(cdf.get_id()) + dbutil.JSON_SUFFIX)
