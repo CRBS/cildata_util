@@ -204,7 +204,68 @@ def main(args):
 
     desc = """
               Version {version}
-    """.format(version=cildata_util.__version__)
+
+              Downloads images and videos from legacy Cell Image Library
+              website and Omero webservice. This is one of three programs
+              needed retrieve & convert data. The other two are
+              cildataconverter.py and cildataupdatedb.py. Invoking
+              those programs with --help will provide more information.
+
+              This script first gets a list of image and video dataset ids
+              by querying the database defined by the first argument
+              (databaseconf) to this program. The script then downloads,
+              via http, the images and videos to images/ & videos/
+              subdirectories under the second argument (destdir).
+
+              Each dataset ID gets its own directory and within a json
+              file is written containing information about the data
+              downloaded.
+
+              For image datasets the following files are downloaded:
+
+              {cil_jpg_url}/<ID>.jpg
+              {omero_url}/images/<ID>.tif
+              {omero_url}/images/<ID>.raw
+
+              For video datasets the following files are downloaded:
+
+              {cil_jpg_url}/<ID>.jpg
+              {cil_video_url}/<ID>.flv
+              {omero_url}/images/<ID>.tif
+              {omero_url}/images/<ID>.raw
+
+              Database configuration file:
+
+              The first argument is expected to be a database configuration
+              file. This file should have the following format:
+
+              [postgres]
+
+              user = <USER>
+              password = <PASSWORD>
+              port = <PORT>
+              host = <HOST>
+              database = <DATABASE_NAME>
+
+              Example:
+
+              [postgres]
+
+              user = bob
+              password = 12345
+              port = 5432
+              host = mydb.foo.com
+              database = cildb
+
+              For more information please visit:
+
+              https://github.com/slash-segmentation/CIL_file_download_tool/wiki
+
+    """.format(version=cildata_util.__version__,
+               cil_jpg_url='http://cellimagelibrary.org/images/download_jpeg',
+               omero_url='http://grackle.crbs.ucsd.edu:8080/OmeroWebService'
+                         '/images',
+               cil_video_url='http://cellimagelibrary.org/videos')
 
     theargs = _parse_arguments(desc, args[1:])
     theargs.program = args[0]
