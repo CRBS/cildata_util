@@ -64,7 +64,7 @@ Credits
 
 This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
 
-.. _LICENSE.txt https://github.com/slash-segmentation/CIL_file_download_tool/blob/master/LICENSE.txt
+.. _LICENSE.txt: https://github.com/slash-segmentation/CIL_file_download_tool/blob/master/LICENSE.txt
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
 
