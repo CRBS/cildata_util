@@ -96,6 +96,38 @@ def main(args):
 
     desc = """
               Version {version}
+
+              Given a directory of images and videos (1st argument)
+              converted by cildataconverter.py, this script adds the datasets
+              to the database specified by the configuration file
+              passed in as the first argument to this script.
+
+              This script uses the #.json file that is stored within each
+              dataset folder for most of the information.
+
+              The database table is expected to have this structure
+              as shown from output of psql \d:
+
+                          Table "public.cil_download_status"
+                    Column      |            Type             | Modifiers
+              ------------------+-----------------------------+-----------
+               id               | bigint                      | not null
+               image_id         | bigint                      |
+               is_video         | boolean                     |
+               file_name        | text                        |
+               download_success | boolean                     |
+               download_time    | timestamp without time zone |
+               checksum         | boolean                     |
+               mime_type        | text                        |
+               num_of_bytes     | bigint                      |
+               checksum_value   | text                        |
+               Indexes:
+                   "download_status_pk" PRIMARY KEY, btree (id)
+
+
+              For more information please visit:
+
+              https://github.com/slash-segmentation/CIL_file_download_tool/wiki
     """.format(version=cildata_util.__version__)
 
     theargs = _parse_arguments(desc, args[1:])
