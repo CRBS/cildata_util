@@ -283,11 +283,22 @@ class CILDataFileDatabaseUpdater(object):
                                  'file is jpg')
                     cdf.set_is_video(False)
                 thedatestr = 'now()'
+
+                if cdf.get_mime_type() is None:
+                    logger.debug('mime type was None setting to '
+                                 'application/octet-stream')
+                    cdf.set_mime_type('application/octet-stream')
+
+                if cdf.get_file_size() is None:
+                    logger.debug('Checksum is None setting to 0')
+                    cdf.set_file_size(0)
                 try:
                     dt = parser.parse(cdf.get_headers()['Date'])
                     thedatestr = "'" + dt.strftime('%Y-%m-%d %I:%M:%S') + "'"
                 except ValueError as e:
-                    logger.error('Unable to get date from header: ' + str(e))
+                    logger.error('ValueError: Unable to get date from header: ' + str(e))
+                except TypeError as et:
+                    logger.error('TypeError: Unable to get date from header: ' + str(et))
 
                 insert_str = ("INSERT INTO cil_download_status(id,image_id," +
                               "is_video,file_name,download_success," +
@@ -298,7 +309,7 @@ class CILDataFileDatabaseUpdater(object):
                               str(cdf.get_is_video()) + ",'" +
                               cdf.get_file_name() + "'," +
                               str(cdf.get_download_success()) + "," + thedatestr + ",True,'" +
-                              cdf.get_checksum() + "','" +
+                              str(cdf.get_checksum()) + "','" +
                               cdf.get_mime_type() + "'," +
                               str(cdf.get_file_size()) + ")")
                 logger.debug(insert_str)
