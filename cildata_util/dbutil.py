@@ -634,7 +634,8 @@ class CILDataFileFromDatabaseFactory(object):
     IMG_SUFFIX_LIST = [TIF_SUFFIX, JPG_SUFFIX, RAW_SUFFIX]
     VID_SUFFIX_LIST = [FLV_SUFFIX, RAW_SUFFIX, JPG_SUFFIX]
 
-    def __init__(self, conn, id=None, skipifrawfalse=False):
+    def __init__(self, conn, id=None, skipifrawfalse=False,
+                 skipifprocessedtimeset=False):
         """Constructor
         :param conn: database connection already connected
         :param id: only return CILDataFile objects with matching id.
@@ -643,6 +644,7 @@ class CILDataFileFromDatabaseFactory(object):
         self._conn = conn
         self._id = id
         self._skipifrawfalse = skipifrawfalse
+        self._skipifprocessedtimeset = skipifprocessedtimeset
 
     def get_cildatafiles(self):
         """Queries database to get CILDataFile objects
@@ -709,9 +711,14 @@ class CILDataFileFromDatabaseFactory(object):
                 idfilter = " AND image_id='CIL_" + self._id + "'"
             else:
                 idfilter = ''
+
+            processedtimefilter = ''
+            if self._skipifprocessedtimeset is True:
+                processedtimefilter = " AND processed_time is null"
+
             cursor.execute("SELECT replace(image_id,'CIL_', '') as image_id,"
                            "is_video, has_raw from cil_data_type where is_public=true" +
-                           idfilter)
+                           idfilter + processedtimefilter)
 
             for entry in cursor.fetchall():
                 cdf = CILDataFile(entry[0])

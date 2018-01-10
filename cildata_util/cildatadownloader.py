@@ -39,6 +39,9 @@ def _parse_arguments(desc, args):
     parser.add_argument('--skipifexists', action='store_true',
                         help='Skip download if directory for id exists '
                              'on filesystem')
+    parser.add_argument('--skipifprocessedtimeset', action='store_true',
+                        help='Only download entries whose processed_time in '
+                             'database is null')
     parser.add_argument('--retryfailed', action='store_true',
                         help='Going off of filesystem retry any failed'
                              'downloads')
@@ -136,7 +139,9 @@ def _download_cil_data_files(theargs):
     try:
 
         conn = db.get_connection()
-        fac = CILDataFileFromDatabaseFactory(conn, id=theargs.id)
+        fac = CILDataFileFromDatabaseFactory(conn, id=theargs.id,
+                                             skipifprocessedtimeset=
+                                             theargs.skipifprocessedtimeset)
         cildatafiles = fac.get_cildatafiles()
         logger.info('Found ' + str(len(cildatafiles)) + ' entries')
 
