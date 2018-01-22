@@ -64,12 +64,19 @@ def _generate_report(theargs):
             failed_count += 1
             failed_list.append(cdf)
         else:
-            if cdf.get_mime_type() is None:
-                logger.debug(cdf.get_file_name() + 'mime type is None')
+            if cdf.get_file_size() is 0:
+                failed_id_hash[cdf.get_id()] = True
+                if theargs.printfailed is True:
+                    sys.stdout.write(cdf.get_file_name() + '\n')
+                failed_count += 1
+                failed_list.append(cdf)
             else:
-                if cdf.get_mime_type().startswith('text'):
-                    logger.debug('Success, but type is text: ' +
-                                 cdf.get_file_name())
+                if cdf.get_mime_type() is None:
+                    logger.debug(cdf.get_file_name() + 'mime type is None')
+                else:
+                    if cdf.get_mime_type().startswith('text'):
+                        logger.debug('Success, but type is text: ' +
+                                     cdf.get_file_name())
 
         if cdf.get_mime_type() not in mimetypes:
             mimetypes[cdf.get_mime_type()] = 1
