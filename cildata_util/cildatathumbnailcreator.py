@@ -104,6 +104,18 @@ def _create_thumbnail_images(image_file, size_list, abs_destdir):
     return 0
 
 
+def _get_size_list_from_arg(size_list_arg):
+    """Generates a list of sizes from argument
+    :param size_list_arg: csv parameter from command line
+    :returns: list of sizes as ints
+    """
+    raw_size_list = size_list_arg.sizes.split(',')
+    size_list = []
+    # TODO add better loging and error handling here
+    for entry in raw_size_list:
+        size_list.append(int(entry))
+    return size_list
+
 def _create_thumbnails(theargs):
     """Examine all downloaded data and retry any
        failed entries
@@ -111,11 +123,8 @@ def _create_thumbnails(theargs):
 
     abs_input = os.path.abspath(theargs.downloaddir)
     abs_destdir = os.path.abspath(theargs.destdir)
-    raw_size_list = theargs.sizes.split(',')
-    size_list = []
 
-    for entry in raw_size_list:
-        entry.append(int(entry))
+    size_list = _get_size_list_from_arg(theargs.sizes)
 
     if os.path.isfile(abs_input):
         logger.debug('Input is a file: ' + abs_input)
@@ -127,6 +136,8 @@ def _create_thumbnails(theargs):
 
     images_destdir = os.path.join(abs_input, dbutil.IMAGES_DIR)
     videos_destdir = os.path.join(abs_input, dbutil.VIDEOS_DIR)
+    # TODO above paths should be put into a list and have same
+    # TODO function process entries within.
 
     return 0
 
@@ -161,9 +172,9 @@ def main(args):
               If the <INPUT> is an image file:
               
               A thumbnail for each size in {sizes} flag will 
-              be created with file name convention described 
-              below in 'Output thumbnail naming convention' section 
-              below.
+              be created under <DEST/<INPUT -minus suffix> directory
+              with file name convention described below in 
+              'Output thumbnail naming convention' section below.
               
               If the <INPUT> is a directory:
               
