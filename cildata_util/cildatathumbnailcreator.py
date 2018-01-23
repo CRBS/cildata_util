@@ -20,6 +20,8 @@ SUFFIX_FLAG = '--suffix'
 
 THUMBNAIL_LABEL = '_thumbnailx'
 
+SUFFIX_DELIMITER = '.'
+
 
 def _parse_arguments(desc, args):
     """Parses command line arguments
@@ -56,6 +58,65 @@ def _parse_arguments(desc, args):
     return parser.parse_args(args)
 
 
+def _extract_file_name_and_suffix(file_path,
+                                  suffix_delimiter=SUFFIX_DELIMITER):
+    """Extracts file name and suffix from file_path using
+       last period as delimiter of suffix.
+    :param file_path: path to file
+    :param suffix_delimiter: delimiter to find suffix. default is SUFFIX_DELIMITER
+           which is a .
+    :returns tuple (file name, suffix) ie for /foo/blah.jpg with . for
+             suffix_delimiter return would be ('blah','jpg') If no suffix is
+             found None is set as second value in tuple. If None is passed as
+             file_path (None, None) is returned
+    """
+    if file_path is None:
+        return None, None
+
+    # just get filename with basename call
+    file_name = os.path.basename(file_path)
+
+    if file_name is '':
+        return '', None
+
+    # find last index of suffix_delimiter
+    delim_pos = file_name.rfind(suffix_delimiter)
+    if delim_pos is -1:
+        return file_name, None
+
+    return file_name[:delim_pos], file_name[delim_pos:]
+
+
+def _create_single_thumbnail(image, size):
+    """Given a Pillow Image via `image` variable, create a
+       new image thumbnail with dimension of `size`,`size`
+       keeping aspect ratio filling with black for non square images
+    :returns: Pillow Image object the caller should close
+    """
+    im_copy = None
+    try:
+        im_copy = image.copy()
+        im_copy.thumbnail((size, size), Image.LANCZOS)
+        thumby_img = Image.new(image.mode, (size, size))
+        paste_x = 0
+        paste_y = 0
+        if im_copy.size[0] < size:
+            paste_x = int((size - im_copy.size[0]) / 2)
+        if im_copy.size[1] < size:
+            paste_y = int((size - im_copy.size[1]) / 2)
+        thumby_img.paste(im_copy, (paste_x, paste_y))
+        return thumby_img
+    except IOError:
+        logger.exception('Caught exception')
+        if thumby_img is not None:
+            thumby_img.close()
+        return None
+    finally:
+        if im_copy is not None:
+            im_copy.close()
+    return None
+
+
 def _create_thumbnail_images(image_file, size_list, abs_destdir):
     """
     Given an image file this function generates a set of thumbnail
@@ -69,27 +130,20 @@ def _create_thumbnail_images(image_file, size_list, abs_destdir):
     :param abs_destdir: Base destination directory
     :return: 0 upon otherwise 1 or greater for failure
     """
-    # TODO Split this function into smaller pieces
+    thumbprefix, suffix = _extract_file_name_and_suffix(image_file)
+
+    if suffix is None:
+        logger.error('No suffix found for image file: ' + image_file)
+        return 2
+
     try:
         im = Image.open(image_file)
     except IOError as e:
         logger.exception('Caught exception')
         return 1
 
-    image_name = os.path.basename(image_file)
-    thumbprefix = re.sub('\.*$', '', image_name)
-    suffix = '.' + re.sub('^.*\.', '', image_name)
     for cursize in size_list:
-        thumby_img = Image.new(im.mode,(cursize, cursize))
-        im_copy = im.copy()
-        im_copy.thumbnail((cursize, cursize), Image.LANCZOS)
-        paste_x = 0
-        paste_y = 0
-        if im_copy.size[0] < cursize:
-            paste_x = int((cursize - im_copy.size[0])/2)
-        if im_copy.size[1] < cursize:
-            paste_y = int((cursize - im_copy.size[1])/2)
-        thumby_img.paste(im_copy, (paste_x, paste_y))
+        thumby_img = _create_thumbnail_images(im, cursize)
         dest_subdir = os.path.join(abs_destdir, thumbprefix)
         if not os.path.isdir(dest_subdir):
             os.makedirs(dest_subdir, mode=0o755)
@@ -97,7 +151,6 @@ def _create_thumbnail_images(image_file, size_list, abs_destdir):
                             thumbprefix + THUMBNAIL_LABEL + str(cursize) +
                             suffix)
         thumby_img.save(dest)
-        im_copy.close()
         thumby_img.close()
     im.close()
 
@@ -109,12 +162,24 @@ def _get_size_list_from_arg(size_list_arg):
     :param size_list_arg: csv parameter from command line
     :returns: list of sizes as ints
     """
-    raw_size_list = size_list_arg.sizes.split(',')
+    if size_list_arg is None:
+        logger.error('No sizes passed in')
+        return []
+
+    raw_size_list = size_list_arg.split(',')
     size_list = []
     # TODO add better loging and error handling here
     for entry in raw_size_list:
-        size_list.append(int(entry))
+        try:
+            val = int(entry)
+            if val <= 0:
+                raise ValueError('Values must be positive integers')
+            size_list.append(int(entry))
+        except ValueError as ve:
+            logger.exception('Skipping non-numeric value in sizes list: ' +
+                             str(entry))
     return size_list
+
 
 def _create_thumbnails(theargs):
     """Examine all downloaded data and retry any
