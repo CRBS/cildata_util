@@ -30,6 +30,7 @@ Dependencies
  * `requests <https://pypi.python.org/pypi/requests>`_
  * `jsonpickle <https://pypi.python.org/pypi/jsonpickle>`_
  * `python-dateutil <https://pypi.python.org/pypi/python-dateutil>`_
+ * `Pillow <https://pypi.python.org/pypi/Pillow>`_
 
 Installation
 ------------
