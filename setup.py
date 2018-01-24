@@ -17,7 +17,8 @@ requirements = [
     "pg8000",
     "requests",
     "jsonpickle",
-    "python-dateutil"
+    "python-dateutil",
+    "Pillow"
 ]
 
 setup_requirements = [
@@ -30,7 +31,8 @@ test_requirements = [
     "pg8000",
     "requests",
     "jsonpickle",
-    "python-dateutil"
+    "python-dateutil",
+    "Pillow"
 ]
 
 setup(
