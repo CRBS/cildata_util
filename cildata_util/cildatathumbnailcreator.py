@@ -5,7 +5,6 @@ import argparse
 import sys
 import logging
 import os
-import re
 from PIL import Image
 
 import cildata_util
@@ -143,7 +142,11 @@ def _create_thumbnail_images(image_file, size_list, abs_destdir):
         return 1
 
     for cursize in size_list:
-        thumby_img = _create_thumbnail_images(im, cursize)
+        thumby_img = _create_single_thumbnail(im, cursize)
+        if thumby_img is None:
+            logger.error('Unable to create thumbnail for image: ' + image_file)
+            continue
+
         dest_subdir = os.path.join(abs_destdir, thumbprefix)
         if not os.path.isdir(dest_subdir):
             os.makedirs(dest_subdir, mode=0o755)
@@ -168,7 +171,7 @@ def _get_size_list_from_arg(size_list_arg):
 
     raw_size_list = size_list_arg.split(',')
     size_list = []
-    # TODO add better loging and error handling here
+    # TODO add better logging and error handling here
     for entry in raw_size_list:
         try:
             val = int(entry)
@@ -178,7 +181,34 @@ def _get_size_list_from_arg(size_list_arg):
         except ValueError as ve:
             logger.exception('Skipping non-numeric value in sizes list: ' +
                              str(entry))
+    logger.debug('Size List: ' + str(size_list))
     return size_list
+
+
+def _get_list_of_numeric_directories(dir_path):
+    """Given a `dir_path` find all directories with numeric
+       name within and add to list
+       :returns: list of numeric directories (just directory name!!!)
+    """
+    if dir_path is None:
+        logger.error('Path is None')
+        return []
+
+    if not os.path.isdir(dir_path):
+        logger.error('Path is not a directory: ' + dir_path)
+        return []
+
+    path_list = []
+    for entry in os.listdir(dir_path):
+        fp = os.path.join(dir_path, entry)
+        if os.path.isdir(fp):
+            try:
+                int(entry)
+            except ValueError:
+                continue
+            path_list.append(entry)
+
+    return path_list
 
 
 def _create_thumbnails(theargs):

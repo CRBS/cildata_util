@@ -66,5 +66,15 @@ class TestCILDataThumbnailCreator(unittest.TestCase):
 
         res.close()
 
+        im = Image.new('RGB', (500, 400), color=(255, 0, 0))
+        res = cildatathumbnailcreator._create_single_thumbnail(im, 41)
+        self.assertEqual(res.size, (41, 41))
+        self.assertEqual(res.getpixel((0, 0)), (0, 0, 0))
+        self.assertEqual(res.getpixel((0, 3)), (0, 0, 0))
+        self.assertEqual(res.getpixel((0, 4)), (255, 0, 0))
+        self.assertEqual(res.getpixel((0, 37)), (0, 0, 0))
+        self.assertEqual(res.getpixel((0, 35)), (255, 0, 0))
+        self.assertEqual(res.getpixel((0, 25)), (255, 0, 0))
+        res.close()
 
 
