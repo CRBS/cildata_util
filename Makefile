@@ -1,4 +1,4 @@
-.PHONY: clean clean-test clean-pyc clean-build docs help
+.PHONY: clean clean-test clean-pyc clean-build docs help updateversion
 .DEFAULT_GOAL := help
 define BROWSER_PYSCRIPT
 import os, webbrowser, sys
@@ -88,4 +88,13 @@ dist: clean ## builds source and wheel package
 install: clean ## install the package to the active Python's site-packages
 	python setup.py install
 
-
+updateversion:
+	@cv=`egrep '^\s+version=' setup.py | sed "s/^.*='//" | sed "s/'.*//"`; \
+        read -p "Current ($$cv) enter new version: " vers; \
+        echo "Updating setup.py & cildata_util/__init__.py with new version: $$vers"; \
+        sed -i "s/version='.*',/version='$$vers',/" setup.py ; \
+        sed -i "s/__version__ = '.*'/__version__ = '$$vers'/" cildata_util/__init__.py
+	@echo -n "  Updated setup.py: " ; \
+        grep "version" setup.py ; 
+	@echo -n "  Updated cildata_util/__init__.py: " ; \
+        grep "__version__" cildata_util/__init__.py
