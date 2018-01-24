@@ -21,6 +21,8 @@ THUMBNAIL_LABEL = '_thumbnailx'
 
 SUFFIX_DELIMITER = '.'
 
+DEFAULT_SUFFIX = SUFFIX_DELIMITER + 'jpg'
+
 
 def _parse_arguments(desc, args):
     """Parses command line arguments
@@ -43,10 +45,11 @@ def _parse_arguments(desc, args):
                              ' aspect ratio and be padded for'
                              ' non square images with black. '
                              '(default 88,140,220,512)')
-    parser.add_argument(SUFFIX_FLAG, default = '.jpg',
-                        help='Suffix for images. (default .jpg)')
+    parser.add_argument(SUFFIX_FLAG, default = DEFAULT_SUFFIX,
+                        help='Suffix for images. (default ' + DEFAULT_SUFFIX +
+                             ')')
     parser.add_argument('--overwrite', action='store_true',
-                        help='If set overwrites any existing thumbnails. '
+                        help='NOT IMPLEMENTED. If set overwrites any existing thumbnails. '
                              'Otherwise existing thumbnails are skipped.')
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
@@ -89,6 +92,7 @@ def _create_single_thumbnail(image, size):
     :returns: Pillow Image object the caller should close
     """
     im_copy = None
+    thumby_img = None
     try:
         im_copy = image.copy()
         im_copy.thumbnail((size, size), Image.LANCZOS)
@@ -101,7 +105,7 @@ def _create_single_thumbnail(image, size):
             paste_y = int((size - im_copy.size[1]) / 2)
         thumby_img.paste(im_copy, (paste_x, paste_y))
         return thumby_img
-    except IOError:
+    except Exception:
         logger.exception('Caught exception')
         if thumby_img is not None:
             thumby_img.close()
@@ -109,7 +113,6 @@ def _create_single_thumbnail(image, size):
     finally:
         if im_copy is not None:
             im_copy.close()
-    return None
 
 
 def _create_thumbnail_images(image_file, size_list, abs_destdir):
@@ -141,7 +144,7 @@ def _create_thumbnail_images(image_file, size_list, abs_destdir):
         thumby_img = _create_single_thumbnail(im, cursize)
         if thumby_img is None:
             logger.error('Unable to create thumbnail for image: ' + image_file)
-            continue
+            return 3
 
         dest_subdir = os.path.join(abs_destdir, thumbprefix)
         if not os.path.isdir(dest_subdir):
@@ -206,6 +209,28 @@ def _get_list_of_numeric_directories(dir_path):
     return path_list
 
 
+def _create_thumbnails_for_entries_in_subdirs(dir_entry,
+                                              size_list,
+                                              abs_destdir,
+                                              suffix):
+    """Given a directory this function looks for
+    all numeric subdirectories and then for images within
+    that have same name as numeric subdirectory with
+    matching suffix. """
+    status = 0
+    for entry in _get_list_of_numeric_directories(dir_entry):
+        img_file = os.path.join(dir_entry, entry, entry + suffix)
+        logger.debug('Looking for file: ' + img_file)
+        if not os.path.isfile(img_file):
+            logger.debug('Skipping ' + str(entry) + ' no image found')
+            continue
+        res = _create_thumbnail_images(img_file, size_list, abs_destdir)
+        if res != 0:
+            status = 1
+
+    return status
+
+
 def _create_thumbnails(theargs):
     """Examine all downloaded data and retry any
        failed entries
@@ -234,14 +259,16 @@ def _create_thumbnails(theargs):
     if os.path.isdir(videos_dir):
         dir_list.append(videos_dir)
 
-    res = 0
-    # TODO add support to process images/ & videos/ directories
-    # for dir_entry in dir_list:
-    #     res += _create_thumbnails_for_entries_in_subdirs(dir_entry,
-    #                                                      size_list,
-    #                                                      abs_destdir)
+    status = 0
+    for dir_entry in dir_list:
+        res = _create_thumbnails_for_entries_in_subdirs(dir_entry,
+                                                        size_list,
+                                                        abs_destdir,
+                                                        theargs.suffix)
+        if res != 0:
+            status = 4
 
-    return res
+    return status
 
 
 def main(args):
@@ -359,7 +386,7 @@ def main(args):
         return _create_thumbnails(theargs)
     except Exception:
         logger.exception('Caught fatal exception')
-        return 1
+        return 5
 
 
 if __name__ == '__main__':  # pragma: no cover
