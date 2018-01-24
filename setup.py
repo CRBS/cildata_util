@@ -37,7 +37,7 @@ test_requirements = [
 
 setup(
     name='cildata_util',
-    version='0.1.0',
+    version='0.2.0',
     description="Contains utilities to extract files and data from legacy Cell Image Library",
     long_description=readme + '\n\n' + history,
     author="Chris Churas",
