@@ -45,7 +45,7 @@ def _parse_arguments(desc, args):
                              ' aspect ratio and be padded for'
                              ' non square images with black. '
                              '(default 88,140,220,512)')
-    parser.add_argument(SUFFIX_FLAG, default = DEFAULT_SUFFIX,
+    parser.add_argument(SUFFIX_FLAG, default=DEFAULT_SUFFIX,
                         help='Suffix for images. (default ' + DEFAULT_SUFFIX +
                              ')')
     parser.add_argument('--overwrite', action='store_true',
