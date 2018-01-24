@@ -45,13 +45,9 @@ def _parse_arguments(desc, args):
                              '(default 88,140,220,512)')
     parser.add_argument(SUFFIX_FLAG, default = '.jpg',
                         help='Suffix for images. (default .jpg)')
-    parser.add_argument('--id', help='Only convert data with id passed in.')
     parser.add_argument('--overwrite', action='store_true',
                         help='If set overwrites any existing thumbnails. '
                              'Otherwise existing thumbnails are skipped.')
-    parser.add_argument('--dryrun', action='store_true',
-                        help='If set, simply output via logging at INFO level '
-                             'what thumbnails will be created.')
     parser.add_argument('--version', action='version',
                         version=('%(prog)s ' + cildata_util.__version__))
     return parser.parse_args(args)
@@ -171,7 +167,6 @@ def _get_size_list_from_arg(size_list_arg):
 
     raw_size_list = size_list_arg.split(',')
     size_list = []
-    # TODO add better logging and error handling here
     for entry in raw_size_list:
         try:
             val = int(entry)
@@ -229,12 +224,24 @@ def _create_thumbnails(theargs):
         logger.error('Expected a directory, but didnt get one')
         return 1
 
-    images_destdir = os.path.join(abs_input, dbutil.IMAGES_DIR)
-    videos_destdir = os.path.join(abs_input, dbutil.VIDEOS_DIR)
-    # TODO above paths should be put into a list and have same
-    # TODO function process entries within.
+    dir_list = [abs_input]
 
-    return 0
+    images_dir = os.path.join(abs_input, dbutil.IMAGES_DIR)
+    if os.path.isdir(images_dir):
+        dir_list.append(images_dir)
+
+    videos_dir = os.path.join(abs_input, dbutil.VIDEOS_DIR)
+    if os.path.isdir(videos_dir):
+        dir_list.append(videos_dir)
+
+    res = 0
+    # TODO add support to process images/ & videos/ directories
+    # for dir_entry in dir_list:
+    #     res += _create_thumbnails_for_entries_in_subdirs(dir_entry,
+    #                                                      size_list,
+    #                                                      abs_destdir)
+
+    return res
 
 
 def main(args):

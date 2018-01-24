@@ -77,4 +77,39 @@ class TestCILDataThumbnailCreator(unittest.TestCase):
         self.assertEqual(res.getpixel((0, 25)), (255, 0, 0))
         res.close()
 
+    def test_get_list_of_numeric_directories(self):
+        temp_dir = tempfile.mkdtemp()
+        try:
+            res = cildatathumbnailcreator.\
+                _get_list_of_numeric_directories(temp_dir)
+            self.assertEqual(res, [])
+
+            fakefile = os.path.join(temp_dir, '12345')
+            open(fakefile, 'a').close()
+            res = cildatathumbnailcreator. \
+                _get_list_of_numeric_directories(temp_dir)
+            self.assertEqual(res, [])
+
+            fakedir = os.path.join(temp_dir, '4fb4')
+            os.makedirs(fakedir, mode=0o755)
+            res = cildatathumbnailcreator. \
+                _get_list_of_numeric_directories(temp_dir)
+            self.assertEqual(res, [])
+
+            dirone = os.path.join(temp_dir, '12')
+            os.makedirs(dirone, mode=0o755)
+            res = cildatathumbnailcreator. \
+                _get_list_of_numeric_directories(temp_dir)
+            self.assertEqual(res, ['12'])
+
+            dirtwo = os.path.join(temp_dir, '45986')
+            os.makedirs(dirtwo, mode=0o755)
+            res = cildatathumbnailcreator. \
+                _get_list_of_numeric_directories(temp_dir)
+            self.assertEqual(len(res), 2)
+            self.assertTrue('12' in res)
+            self.assertTrue('45986' in res)
+
+        finally:
+            shutil.rmtree(temp_dir)
 
