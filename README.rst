@@ -4,8 +4,8 @@ CIL Data Extraction Utility
 
 
 
-.. image:: https://pyup.io/repos/github/slash-segmentation/CIL_file_download_tool/shield.svg
-     :target: https://pyup.io/repos/github/slash-segmentation/CIL_file_download_tool/
+.. image:: https://pyup.io/repos/github/slash-segmentation/cildata_util/shield.svg
+     :target: https://pyup.io/repos/github/slash-segmentation/cildata_util/
      :alt: Updates
 
 
@@ -16,7 +16,7 @@ Library website.
 
 For more information please visit our wiki page:
 
-https://github.com/slash-segmentation/CIL_file_download_tool/wiki
+https://github.com/slash-segmentation/cildata_util/wiki
 
 Compatibility
 -------------
@@ -59,14 +59,14 @@ See LICENSE.txt_
 Bugs
 ----
 
-Please report them `here <https://github.com/slash-segmentation/CIL_file_download_tool/issues>`_
+Please report them `here <https://github.com/slash-segmentation/cildata_util/issues>`_
 
 Credits
 ---------
 
 This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypackage`_ project template.
 
-.. _LICENSE.txt: https://github.com/slash-segmentation/CIL_file_download_tool/blob/master/LICENSE.txt
+.. _LICENSE.txt: https://github.com/slash-segmentation/cildata_util/blob/master/LICENSE.txt
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
 
