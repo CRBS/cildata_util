@@ -205,7 +205,7 @@ def main(args):
 
               For more information visit:
 
-              https://github.com/slash-segmentation/CIL_file_download_tool/wiki
+              https://github.com/slash-segmentation/cildata_util/wiki
     """.format(version=cildata_util.__version__)
 
     theargs = _parse_arguments(desc, args[1:])

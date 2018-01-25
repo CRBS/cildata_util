@@ -802,7 +802,7 @@ class CILDataFileListFromJsonPickleFactory(object):
 
 class CILDataFileConverter(object):
     """Following guidelines set in
-    https://github.com/slash-segmentation/CIL_file_download_tool/wiki
+    https://github.com/slash-segmentation/cildata_util/wiki
     Instances of this class perform renames and create new CILDataFile
     objects and physical files.
     """

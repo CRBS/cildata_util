@@ -32,13 +32,13 @@ You can either clone the public repository:
 
 .. code-block:: console
 
-    $ git clone git://github.com/slash-segmentation/CIL_file_download_tool
+    $ git clone git://github.com/slash-segmentation/cildata_util
 
 Or download the `tarball`_:
 
 .. code-block:: console
 
-    $ curl  -OL https://github.com/slash-segmentation/CIL_file_download_tool/tarball/master
+    $ curl  -OL https://github.com/slash-segmentation/cildata_util/tarball/master
 
 Once you have a copy of the source, you can install it with:
 
@@ -47,5 +47,5 @@ Once you have a copy of the source, you can install it with:
     $ python setup.py install
 
 
-.. _Github repo: https://github.com/slash-segmentation/CIL_file_download_tool
-.. _tarball: https://github.com/slash-segmentation/CIL_file_download_tool/tarball/master
+.. _Github repo: https://github.com/slash-segmentation/cildata_util
+.. _tarball: https://github.com/slash-segmentation/cildata_util/tarball/master
