@@ -9,8 +9,9 @@ CIL Data Extraction Utility
      :alt: Updates
 
 
-Cell Image Library Data Extraction Utility is a Python application with a set of
-scripts to download image and video data from the legacy Cell Image Library website 
+Cell Image Library Data Extraction Utility is a Python application with a set 
+of scripts to download & convert image/video data from the legacy Cell Image 
+Library website. 
 (https://cellimagelibrary.com)
 
 For more information please visit our wiki page:
