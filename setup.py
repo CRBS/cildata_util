@@ -3,13 +3,47 @@
 
 """The setup script."""
 
+import os
+import sys
+import re
+
 from setuptools import setup, find_packages
+
+THIS_PACKAGE_NAME='cildata_util'
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
 
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
+
+try:
+    import rstcheck
+    found_errors = False
+
+    readme_errors = list(rstcheck.check(readme))
+    if len(readme_errors) > 0:
+        sys.stderr.write('\nErrors in README.rst [(line #, error)]\n' +
+                         str(readme_errors) + '\n')
+        found_errors = True
+
+    history_errors = list(rstcheck.check(history))
+    if len(history_errors) > 0:
+        sys.stderr.write('\nErrors in HISTORY.rst [(line #, error)]\n' +
+                         str(history_errors) + '\n')
+
+        found_errors = True
+
+    if 'sdist' in sys.argv or 'bdist_wheel' in sys.argv:
+        if found_errors is True:
+            sys.stderr.write('\n\nEXITING due to errors encountered in'
+                             ' History.rst or Readme.rst.\n\nSee errors above\n\n')
+            sys.exit(1)
+
+except Exception as e:
+    sys.stderr.write('WARNING: rstcheck library found, '
+                     'unable to validate README.rst or HISTORY.rst\n')
+
 
 requirements = [
     "argparse",
@@ -35,9 +69,17 @@ test_requirements = [
     "Pillow"
 ]
 
+# extract version from cildata_util/__init__.py
+version='0.0.0'
+with open(os.path.join(THIS_PACKAGE_NAME, '__init__.py')) as init_file:
+    for line in init_file:
+        if '__version__' in line:
+            version_raw = re.sub("'", '', line.rstrip()).split('=')[1]
+            version = re.sub(' ', '', version_raw)
+
 setup(
     name='cildata_util',
-    version='0.2.0',
+    version=version,
     description="Contains utilities to extract files and data from legacy Cell Image Library",
     long_description=readme + '\n\n' + history,
     author="Chris Churas",
