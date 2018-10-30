@@ -264,7 +264,7 @@ def main(args):
 
               For more information please visit:
 
-              https://github.com/slash-segmentation/cildata_util/wiki
+              https://github.com/CRBS/cildata_util/wiki
 
     """.format(version=cildata_util.__version__,
                cil_jpg_url='http://cellimagelibrary.org/images/download_jpeg',

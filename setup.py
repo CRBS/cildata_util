@@ -84,7 +84,7 @@ setup(
     long_description=readme + '\n\n' + history,
     author="Chris Churas",
     author_email='churas.camera@gmail.com',
-    url='https://github.com/slash-segmentation/cildata_util',
+    url='https://github.com/CRBS/cildata_util',
     packages=find_packages(include=['cildata_util']),
     include_package_data=True,
     install_requires=requirements,

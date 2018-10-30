@@ -370,7 +370,7 @@ def main(args):
               
               For more information visit:
 
-              https://github.com/slash-segmentation/cildata_util/wiki
+              https://github.com/CRBS/cildata_util/wiki
     """.format(images=dbutil.IMAGES_DIR,
                videos=dbutil.VIDEOS_DIR,
                sizes=SIZES_FLAG,
