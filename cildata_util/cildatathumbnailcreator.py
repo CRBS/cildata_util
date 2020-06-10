@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#!/usr/bin/python2
 
 
 import argparse
@@ -152,7 +152,8 @@ def _create_thumbnail_images(image_file, size_list, abs_destdir):
         dest = os.path.join(dest_subdir,
                             thumbprefix + THUMBNAIL_LABEL + str(cursize) +
                             suffix)
-        thumby_img.save(dest)
+        thumby_img = thumby_img.convert("RGB")
+	thumby_img.save(dest)
         thumby_img.close()
     im.close()
 
